@@ -1,12 +1,24 @@
+sudo mc
 sudo su -
-tutanota-desktop 
-join-to-active-directory 
-sudo join-to-active-directory 
-sudo su -
-sudo su -
-id mszabi
-id mszabi@localhost
-history 
-sudo su -
-sudo mc /etc/skel/
-mc .config/
+apt+ plank
+plank
+pkill plank
+mcedit gtk.css
+mc .com
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+xfce4-panel -r
+mcedit ~/.config/gtk-3.0/gtk.css

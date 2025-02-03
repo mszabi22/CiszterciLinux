@@ -13,4 +13,14 @@
       </metadata>
     </info>
   </bookmark>
+  <bookmark href="file:///home/mszabi/Let%C3%B6lt%C3%A9sek" added="2025-02-03T12:51:05.977729Z" modified="2025-02-03T12:51:05.977733Z" visited="2025-02-03T12:51:05.977730Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="inode/directory"/>
+        <bookmark:applications>
+          <bookmark:application name="Thunar" exec="&apos;Thunar %u&apos;" modified="2025-02-03T12:51:05.977731Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
 </xbel>
