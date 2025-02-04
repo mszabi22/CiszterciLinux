@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run this first
+# Run this first #
 apt-get install live-build
 lb clean
 lb config noauto \
