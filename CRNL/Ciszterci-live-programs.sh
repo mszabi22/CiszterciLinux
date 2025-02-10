@@ -108,24 +108,24 @@ cat signal-desktop-keyring.gpg | tee /usr/share/keyrings/signal-desktop-keyring.
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' | tee /etc/apt/sources.list.d/signal-xenial.list
 apt update && sudo apt install signal-desktop
 
-echo -e "${yellow}SimpleX chat install...${white}"
+echo -e "${yellow}Session Messenger install...${white}"
 cd /usr/local/bin
-wget -O simplex-desktop https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-desktop-x86_64.AppImage
-chmod +x simplex-desktop 
+wget -O session-desktop https://getsession.org/linux
+chmod +x session-desktop 
 
 cd /usr/share/icons
-wget https://appimage.github.io/database/SimpleX/icons/512x512/simplex.png -O simplex-logo.png
+wget https://getsession.org/apple-touch-icon.png -O session-logo.png
 
 echo "[Desktop Entry]
-Name=SimpleX.chat
-Exec=/usr/local/bin/simplex-desktop
-Icon=/usr/share/icons/simplex-logo.png
+Name=Session Messenger
+Exec=/usr/local/bin/session-desktop
+Icon=/usr/share/icons/session-logo.png
 
 Encoding=UTF-8
 ExecutionMode=normal
 Type=Application
 Categories=Network;
-Enabled=true" > /usr/share/applications/simplex-desktop.desktop  
+Enabled=true" > /usr/share/applications/session-desktop.desktop  
 
 echo -e "${yellow}Viber install...${white}"
 cd /usr/local/bin
