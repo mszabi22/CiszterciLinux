@@ -190,4 +190,10 @@ dpkg -i teamviewer_amd64.deb
 apt-get -f install -y
 rm teamviewer_amd64.deb
 
+echo -e "${yellow}XAMPP install...${white}"
+wget -O xampp.run https://sourceforge.net/projects/xampp/files/XAMPP%20Linux/8.2.12/xampp-linux-x64-8.2.12-0-installer.run/download
+chmod +x xampp.run
+./xampp.run
+rm -rf xampp.run
+
 echo -e "${green}DONE.${white}"
