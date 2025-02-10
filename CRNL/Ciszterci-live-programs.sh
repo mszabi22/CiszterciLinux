@@ -201,7 +201,7 @@ cd /usr/share/icons
 wget -O xampp-logo.png https://cdn.freelogovectors.net/wp-content/uploads/2021/02/xampp-logo-freelogovectors.net_.png
 echo "[Desktop Entry]
 Name=XAMPP Control Panel
-Exec=sudo ./opt/lampp/manager-linux-x64.run
+Exec=sudo /opt/lampp/manager-linux-x64.run
 Icon=/usr/share/icons/xampp-logo.png
 
 Encoding=UTF-8
@@ -213,7 +213,7 @@ Comment=
 Path=
 Terminal=true
 StartupNotify=false" > /usr/share/applications/xampp.desktop 	
-
+echo "%users ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
 
 echo -e "${green}DONE.${white}"
