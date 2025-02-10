@@ -208,11 +208,7 @@ Encoding=UTF-8
 ExecutionMode=normal
 Type=Application
 Categories=Network;
-Enabled=true
-Comment=
-Path=
-Terminal=true
-StartupNotify=false" > /usr/share/applications/xampp.desktop 	
+Enabled=true" > /usr/share/applications/xampp.desktop 	
 echo "%users ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
 
