@@ -195,5 +195,25 @@ wget -O xampp.run https://sourceforge.net/projects/xampp/files/XAMPP%20Linux/8.2
 chmod +x xampp.run
 ./xampp.run
 rm -rf xampp.run
+chmod +x /opt/lampp/manager-linux-x64.run
+
+cd /usr/share/icons
+wget -O xampp-logo.png https://cdn.freelogovectors.net/wp-content/uploads/2021/02/xampp-logo-freelogovectors.net_.png
+echo "[Desktop Entry]
+Name=XAMPP Control Panel
+Exec=sudo ./opt/lampp/manager-linux-x64.run
+Icon=/usr/share/icons/xampp-logo.png
+
+Encoding=UTF-8
+ExecutionMode=normal
+Type=Application
+Categories=Network;
+Enabled=true
+Comment=
+Path=
+Terminal=true
+StartupNotify=false" > /usr/share/applications/xampp.desktop 	
+
+
 
 echo -e "${green}DONE.${white}"
