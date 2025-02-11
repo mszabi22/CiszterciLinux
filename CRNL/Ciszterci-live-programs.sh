@@ -213,6 +213,6 @@ echo "%sudo ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/
 echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
-echo "Add user: user-setup, adduser"
+echo "Add user: user-setup, adduser, sudo"
 
 echo -e "${green}DONE.${white}"

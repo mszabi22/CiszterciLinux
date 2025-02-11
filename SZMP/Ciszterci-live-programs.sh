@@ -190,6 +190,6 @@ dpkg -i teamviewer_amd64.deb
 apt-get -f install -y
 rm teamviewer_amd64.deb
 
-echo "Add user: user-setup, adduser"
+echo "Add user: user-setup, adduser, sudo"
 
 echo -e "${green}DONE.${white}"
