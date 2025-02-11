@@ -1,6 +1,5 @@
 #!/bin/bash
-ls -1
 DATUM=`date +%Y.%m.%d`
-mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-$DATUM-amd64.iso
-md5sum CiszterciLinux-$DATUM-amd64.iso > CiszterciLinux-$DATUM-amd64.iso.md5
+mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-SZMP-$DATUM-amd64.iso
+md5sum CiszterciLinux-SZMP-$DATUM-amd64.iso > CiszterciLinux-SZMP-$DATUM-amd64.iso.md5
 chown -R majorsza:majorsza CiszterciLinux-*
