@@ -200,7 +200,7 @@ chmod +x /opt/lampp/manager-linux-x64.run
 cd /usr/share/icons
 wget -O xampp-logo.png https://cdn.freelogovectors.net/wp-content/uploads/2021/02/xampp-logo-freelogovectors.net_.png
 echo "[Desktop Entry]
-Name=XAMPP Control Panel
+Name=XAMPP
 Exec=sudo /opt/lampp/manager-linux-x64.run
 Icon=/usr/share/icons/xampp-logo.png
 
@@ -211,5 +211,6 @@ Categories=Network;
 Enabled=true" > /usr/share/applications/xampp.desktop 	
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
+adduser user
 
 echo -e "${green}DONE.${white}"
