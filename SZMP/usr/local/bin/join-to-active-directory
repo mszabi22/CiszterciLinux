@@ -17,7 +17,16 @@ if [ $ADMEMBER_INSTALL = 'i' ]; then
 	systemctl restart sssd 
 	#realm leave --user=pingvin $DOMAINNAME	
 	
-echo "smb://ad/home/tanar/$USER u:\\
-" > /etc/skel/.config/gtk-3.0/bookmarks
-	
+echo "
+if [ \`id \$USER | grep tanár | wc -l\` = \"1\" ]; then
+echo \"smb://ad/home/tanar/\$USER u:\\ 
+smb://ad/public/tanar t:\\
+\" > ~/.config/gtk-3.0/bookmarks
+else
+echo \"smb://ad/home/diak/\$USER u:\\ 
+smb://ad/public/diak s:\\
+\" > ~/.config/gtk-3.0/bookmarks
+fi
+" >> /etc/skel/.bashrc
+
 fi
