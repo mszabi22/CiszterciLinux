@@ -3,6 +3,7 @@ echo "Active Directory member? (i/n)"
 read ADMEMBER_INSTALL
 if [ $ADMEMBER_INSTALL = 'i' ]; then
 	deluser user
+	rm -rf /home/user
 	apt -y install realmd sssd sssd-tools libnss-sss libpam-sss adcli samba-common-bin oddjob oddjob-mkhomedir packagekit 
 	echo "Domain name?"
 	read DOMAINNAME
