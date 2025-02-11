@@ -16,4 +16,8 @@ if [ $ADMEMBER_INSTALL = 'i' ]; then
 	mcedit /etc/sssd/sssd.conf
 	systemctl restart sssd 
 	#realm leave --user=pingvin $DOMAINNAME	
+	
+echo "smb://ad/home/tanar/$USER u:\\
+" > /etc/skel/.config/gtk-3.0/bookmarks
+	
 fi

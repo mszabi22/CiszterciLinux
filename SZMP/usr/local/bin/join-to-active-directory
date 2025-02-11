@@ -2,6 +2,7 @@
 echo "Active Directory member? (i/n)"
 read ADMEMBER_INSTALL
 if [ $ADMEMBER_INSTALL = 'i' ]; then
+	deluser user
 	apt -y install realmd sssd sssd-tools libnss-sss libpam-sss adcli samba-common-bin oddjob oddjob-mkhomedir packagekit 
 	echo "Domain name?"
 	read DOMAINNAME
@@ -15,4 +16,8 @@ if [ $ADMEMBER_INSTALL = 'i' ]; then
 	mcedit /etc/sssd/sssd.conf
 	systemctl restart sssd 
 	#realm leave --user=pingvin $DOMAINNAME	
+	
+echo "smb://ad/home/tanar/$USER u:\\
+" > /etc/skel/.config/gtk-3.0/bookmarks
+	
 fi
