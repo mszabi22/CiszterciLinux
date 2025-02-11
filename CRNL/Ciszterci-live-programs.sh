@@ -210,6 +210,8 @@ Type=Application
 Categories=Network;
 Enabled=true" > /usr/share/applications/xampp.desktop 	
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
+echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
+echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
 echo "Add user: user-setup, adduser"
 
