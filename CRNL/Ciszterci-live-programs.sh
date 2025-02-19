@@ -50,7 +50,6 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools libreoffice-l10n-hu gnome-online-accounts \
     audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet
 
-
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 echo "Include /etc/ssh/sshd_config.d/*.conf
