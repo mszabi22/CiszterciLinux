@@ -50,11 +50,6 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools libreoffice-l10n-hu gnome-online-accounts \
     audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet
 
-firewall-cmd --set-default-zone=drop
-firewall-cmd --permanent --zone=drop --add-service=ssh --add-service=http --add-service=https --add-service=mysql
-firewall-cmd --permanent --direct --add-rule ipv4 filter OUTPUT 0 -j ACCEPT
-firewall-cmd --permanent --zone=drop --add-port=68/udp --add-port=67/udp
-firewall-cmd --reload
 
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
