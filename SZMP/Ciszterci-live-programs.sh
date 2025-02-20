@@ -212,4 +212,9 @@ sudo useradd -M -s /sbin/nologin scan
 sudo usermod -aG smbshare scan
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
+
+
+echo -e "${yellow}root passwd...${white}"
+passwd
+
 echo -e "${green}DONE.${white}"
