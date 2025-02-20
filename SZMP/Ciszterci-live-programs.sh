@@ -210,9 +210,10 @@ sudo chgrp -R smbshare /home/scan
 sudo chmod 2775 /home/scan
 sudo useradd -M -s /sbin/nologin scan
 sudo usermod -aG smbshare scan
+
+echo -e "${yellow}Scan user passwd...${white}"
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
-
 
 echo -e "${yellow}root passwd...${white}"
 passwd
