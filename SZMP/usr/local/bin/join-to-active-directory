@@ -39,7 +39,7 @@ echo "
 if [ \`id \$USER | grep tanár | wc -l\` = \"1\" ]; then
 echo \"smb://ad/home/tanar/\$USER u:\\ 
 smb://ad/public/tanar t:\\
-\" > ~/.config/gtk-3.0/bookmarks
+\" >> ~/.config/gtk-3.0/bookmarks
 else
 echo \"smb://ad/home/diak/\$USER u:\\ 
 smb://ad/public/diak s:\\
