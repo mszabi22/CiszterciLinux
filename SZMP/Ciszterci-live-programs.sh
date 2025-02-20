@@ -183,7 +183,6 @@ Type=Application
 Categories=Network;
 Enabled=true" > /usr/share/applications/rustdesk.desktop 	
 
-
 echo -e "${yellow}TeamViewer install...${white}"
 cd
 wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
@@ -191,6 +190,30 @@ dpkg -i teamviewer_amd64.deb
 apt-get -f install -y
 rm teamviewer_amd64.deb
 
+echo -e "${yellow}Create user...${white}"
 adduser user
+
+echo -e "${yellow}Samba Share...${white}"
+sudo apt install samba smbclient cifs-utils
+sudo mkdir /home/scan
+chmod -R 777 /home/scan
+echo "[scan]
+   comment = Scan Folder
+   path = /home/scan
+   writable = yes
+   guest ok = yes
+   guest only = yes
+   force create mode = 775
+   force directory mode = 775" >> /etc/samba/smb.conf
+sudo groupadd smbshare
+sudo chgrp -R smbshare /home/scan
+sudo chmod 2775 /home/scan
+sudo useradd -M -s /sbin/nologin scan
+sudo usermod -aG smbshare scan
+sudo smbpasswd -a scan
+sudo smbpasswd -e scan
+sudo testparm
+sudo systemctl restart nmbd
+   
 
 echo -e "${green}DONE.${white}"
