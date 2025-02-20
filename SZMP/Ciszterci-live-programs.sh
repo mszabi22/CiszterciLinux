@@ -194,8 +194,8 @@ echo -e "${yellow}Create user...${white}"
 adduser user
 
 echo -e "${yellow}Samba Share...${white}"
-sudo apt install samba smbclient cifs-utils
-sudo mkdir /home/scan
+apt install samba smbclient cifs-utils
+mkdir /home/scan
 chmod -R 777 /home/scan
 echo "[scan]
    comment = Scan Folder
@@ -212,8 +212,4 @@ sudo useradd -M -s /sbin/nologin scan
 sudo usermod -aG smbshare scan
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
-sudo testparm
-sudo systemctl restart nmbd
-   
-
 echo -e "${green}DONE.${white}"
