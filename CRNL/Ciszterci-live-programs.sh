@@ -215,6 +215,32 @@ echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /e
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /usr/bin/firewall-cmd" >> /etc/sudoers
 
+echo -e "${yellow}Create user...${white}"
 adduser user
+
+echo -e "${yellow}Samba Share...${white}"
+apt install samba smbclient cifs-utils
+mkdir /home/scan
+chmod -R 777 /home/scan
+echo "[scan]
+   comment = Scan Folder
+   path = /home/scan
+   writable = yes
+   guest ok = yes
+   guest only = yes
+   force create mode = 775
+   force directory mode = 775" >> /etc/samba/smb.conf
+sudo groupadd smbshare
+sudo chgrp -R smbshare /home/scan
+sudo chmod 2775 /home/scan
+sudo useradd -M -s /sbin/nologin scan
+sudo usermod -aG smbshare scan
+
+echo -e "${yellow}Scan user passwd...${white}"
+sudo smbpasswd -a scan
+sudo smbpasswd -e scan
+
+echo -e "${yellow}root passwd...${white}"
+passwd
 
 echo -e "${green}DONE.${white}"
