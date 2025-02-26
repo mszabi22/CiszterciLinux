@@ -48,7 +48,7 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     firmware-iwlwifi firmware-atheros firmware-brcm80211 blueman ttf-mscorefonts-installer vlc thunderbird thunderbird-l10n-hu \
     gimp simple-scan gnupg gnupg2 gnupg1 eog zstd imagemagick menulibre mugshot keepassxc geany ntpsec zenity\
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools libreoffice-l10n-hu gnome-online-accounts \
-    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet tigervnc-viewer
+    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet tigervnc-viewer zulucrypt-gui
 
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
@@ -144,25 +144,6 @@ ExecutionMode=normal
 Type=Application
 Categories=Network;
 Enabled=true" > /usr/share/applications/viber.desktop  
-
-echo -e "${yellow}VeraCrypt install...${white}"
-cd
-wget https://launchpad.net/veracrypt/trunk/1.26.20/+download/veracrypt-1.26.20-Debian-12-amd64.deb
-dpkg -i veracrypt-1.26.20-Debian-12-amd64.deb
-rm veracrypt-1.26.20-Debian-12-amd64.deb
-apt-get -f install -y
-echo "[Desktop Entry]
-Type=Application
-Name=VeraCrypt
-GenericName=VeraCrypt volume manager
-Comment=Create and mount VeraCrypt encrypted volumes
-Icon=veracrypt
-Exec=sudo /usr/bin/veracrypt %f
-Categories=Office;
-Keywords=encryption,filesystem
-Terminal=false
-MimeType=application/x-veracrypt-volume;application/x-truecrypt-volume;" > /usr/share/applications/veracrypt.desktop
-"%sudo  ALL = (ALL:ALL) NOPASSWD: /usr/bin/veracrypt" >> /etc/sudoers
 
 echo -e "${yellow}RustDesk install...${white}"
 cd /usr/local/bin
