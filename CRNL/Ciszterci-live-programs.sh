@@ -127,6 +127,25 @@ Type=Application
 Categories=Network;
 Enabled=true" > /usr/share/applications/session-desktop.desktop  
 
+echo -e "${yellow}SimpleX chat install...${white}"
+cd /usr/local/bin
+wget -O simplex-desktop https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-desktop-x86_64.AppImage
+chmod +x simplex-desktop 
+
+cd /usr/share/icons
+wget https://appimage.github.io/database/SimpleX/icons/512x512/simplex.png -O simplex-logo.png
+
+echo "[Desktop Entry]
+Name=SimpleX.chat
+Exec=/usr/local/bin/simplex-desktop
+Icon=/usr/share/icons/simplex-logo.png
+
+Encoding=UTF-8
+ExecutionMode=normal
+Type=Application
+Categories=Network;
+Enabled=true" > /usr/share/applications/simplex-desktop.desktop  
+
 echo -e "${yellow}Viber install...${white}"
 cd /usr/local/bin
 wget https://download.cdn.viber.com/desktop/Linux/viber.AppImage
