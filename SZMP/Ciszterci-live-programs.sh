@@ -190,6 +190,26 @@ dpkg -i teamviewer_amd64.deb
 apt-get -f install -y
 rm teamviewer_amd64.deb
 
+echo -e "${yellow}VeraCrypt install...${white}"
+cd
+wget https://launchpad.net/veracrypt/trunk/1.26.7/+download/veracrypt-1.26.7-Debian-12-amd64.deb
+dpkg -i veracrypt-1.26.7-Debian-12-amd64.deb
+apt-get -f install -y
+rm veracrypt-1.26.7-Debian-12-amd64.deb
+apt-get -f install -y
+echo "[Desktop Entry]
+Type=Application
+Name=VeraCrypt
+GenericName=VeraCrypt volume manager
+Comment=Create and mount VeraCrypt encrypted volumes
+Icon=veracrypt
+Exec=sudo /usr/bin/veracrypt %f
+Categories=Office;
+Keywords=encryption,filesystem
+Terminal=false
+MimeType=application/x-veracrypt-volume;application/x-truecrypt-volume;" > /usr/share/applications/veracrypt.desktop
+echo "%sudo  ALL = (ALL:ALL) NOPASSWD: /usr/bin/veracrypt" >> /etc/sudoers
+
 echo -e "${yellow}Create user...${white}"
 adduser user
 
