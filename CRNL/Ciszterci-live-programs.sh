@@ -48,8 +48,7 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     firmware-iwlwifi firmware-atheros firmware-brcm80211 blueman ttf-mscorefonts-installer vlc thunderbird thunderbird-l10n-hu \
     gimp simple-scan gnupg gnupg2 gnupg1 eog zstd imagemagick menulibre mugshot keepassxc geany ntpsec zenity\
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools libreoffice-l10n-hu gnome-online-accounts \
-    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet zulucrypt-gui \
-     krita krita-l10n
+    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate firewalld firewall-config firewall-applet krita krita-l10n
 
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
@@ -109,44 +108,6 @@ cat signal-desktop-keyring.gpg | tee /usr/share/keyrings/signal-desktop-keyring.
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' | tee /etc/apt/sources.list.d/signal-xenial.list
 apt update && sudo apt install signal-desktop
 
-echo -e "${yellow}Session Messenger install...${white}"
-cd /usr/local/bin
-wget -O session-desktop https://getsession.org/linux
-chmod +x session-desktop 
-
-cd /usr/share/icons
-wget https://getsession.org/apple-touch-icon.png -O session-logo.png
-
-echo "[Desktop Entry]
-Name=Session Messenger
-Exec=/usr/local/bin/session-desktop
-Icon=/usr/share/icons/session-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/session-desktop.desktop  
-
-echo -e "${yellow}SimpleX chat install...${white}"
-cd /usr/local/bin
-wget -O simplex-desktop https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-desktop-x86_64.AppImage
-chmod +x simplex-desktop 
-
-cd /usr/share/icons
-wget https://appimage.github.io/database/SimpleX/icons/512x512/simplex.png -O simplex-logo.png
-
-echo "[Desktop Entry]
-Name=SimpleX.chat
-Exec=/usr/local/bin/simplex-desktop
-Icon=/usr/share/icons/simplex-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/simplex-desktop.desktop  
-
 echo -e "${yellow}Viber install...${white}"
 cd /usr/local/bin
 wget https://download.cdn.viber.com/desktop/Linux/viber.AppImage
@@ -164,26 +125,6 @@ ExecutionMode=normal
 Type=Application
 Categories=Network;
 Enabled=true" > /usr/share/applications/viber.desktop  
-
-echo -e "${yellow}RustDesk install...${white}"
-cd /usr/local/bin
-wget https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.AppImage
-mv rustdesk-1.3.1-x86_64.AppImage rustdesk
-chmod +x rustdesk
-cd /usr/share/icons
-wget -q -O rustdesk-logo.png https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.myqnap.org%2Fwp-content%2Fuploads%2Frustdesk-logo.png&f=1&nofb=1&ipt=31c1fd688cfe78d356d7f6339be7858c1972b3270cb2c2ebdbbdeb72fccedc0f&ipo=images
-	
-echo "[Desktop Entry]
-Name=RustDesk
-Exec=/usr/local/bin/rustdesk
-Icon=/usr/share/icons/rustdesk-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/rustdesk.desktop 	
-
 
 echo -e "${yellow}TeamViewer install...${white}"
 cd
