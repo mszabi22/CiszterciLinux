@@ -1,15 +1,10 @@
 #!/bin/bash
-BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"
-mkdir -p "$(dirname "$BOOKMARKS_FILE")"
-
-if id "$USER" | grep -q "tanár"; then
-    cat <<EOF >> "$BOOKMARKS_FILE"
-smb://ad/home/tanar/$USER u:\
-smb://ad/public/tanar t:\
-EOF
+if [ `id \$USER | grep tanár | wc -l` = "1" ]; then
+echo "smb://10.23.0.253/home/tanar/$USER u:\ 
+smb://10.23.0.253/public/tanar t:\
+" >> ~/.config/gtk-3.0/bookmarks
 else
-    cat <<EOF > "$BOOKMARKS_FILE"
-smb://ad/home/diak/$USER u:\
-smb://ad/public/diak s:\
-EOF
+echo "smb://10.23.0.253/home/diak/$USER u:\ 
+smb://10.23.0.253/public/diak s:\
+" > ~/.config/gtk-3.0/bookmarks
 fi
