@@ -182,8 +182,8 @@ sudo smbpasswd -e scan
 echo -e "${yellow}root passwd...${white}"
 passwd
 ########################################################################
+apt-get remove libreoffice-*
+apt autoremove -y
+echo "LibreOffice install!!!"
+echo "Veyon config!!!"
 echo -e "${green}DONE.${white}"
-
-echo "LibreOffice!!!"
-echo "Veyon!!!"
-
