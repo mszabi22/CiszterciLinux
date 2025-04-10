@@ -48,7 +48,7 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     firmware-iwlwifi firmware-atheros firmware-brcm80211 blueman ttf-mscorefonts-installer vlc thunderbird thunderbird-l10n-hu \
     gimp simple-scan gnupg gnupg2 gnupg1 eog zstd imagemagick alacarte menulibre mugshot keepassxc geany ntpsec zenity\
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools gnome-online-accounts \
-    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate krita krita-l10n nfs-common libreoffice-l10n-hu 
+    audacious molly-guard kleopatra clamtk mpv smplayer ntpdate krita krita-l10n nfs-common libreoffice-l10n-hu firewalld firewall-config firewall-applet 
 ########################################################################
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
@@ -182,3 +182,5 @@ echo -e "${yellow}root passwd...${white}"
 passwd
 ########################################################################
 echo -e "${green}DONE.${white}"
+
+echo "LibreOffice!!!"

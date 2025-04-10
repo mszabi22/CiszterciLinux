@@ -7,7 +7,7 @@ fi
 source ~/.bash_aliases
 export EDITOR=mcedit
 
-if [ -f firewall.cmd ]; then
-    sudo bash firewall.cmd
-    rm firewall.cmd
-fi
+#if [ -f firewall.cmd ]; then
+#    sudo bash firewall.cmd
+#    rm firewall.cmd
+#fi
