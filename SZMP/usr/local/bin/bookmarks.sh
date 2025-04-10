@@ -18,6 +18,16 @@ smb://10.23.0.253/home/tanar/$USER u:
 smb://10.23.0.253/public/diak s:
 EOF
         ;;
+
+    *stuff*)
+        cat <<EOF > "$BOOKMARKS_FILE"
+smb://10.23.0.253/home/tanar/$USER u:
+smb://10.23.0.253/public/diak s:
+smb://10.23.0.253/public/tanar t:
+smb://10.23.0.253/public/install i:
+EOF
+        ;;
+
     *)
         cat <<EOF > "$BOOKMARKS_FILE"
 smb://10.23.0.253/home/tanar/$USER u:
