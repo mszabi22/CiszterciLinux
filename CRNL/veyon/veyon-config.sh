@@ -1,5 +1,4 @@
 #!/bin/bash
-#sudo apt install veyon-configurator
 veyon-cli config set Authentication/Method "KeyFileAuthentication"
 sudo veyon-cli authkeys import stuff/public stuff_public_key.pem
 sudo veyon-cli service restart

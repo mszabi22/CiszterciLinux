@@ -6,4 +6,6 @@ firewall-cmd --permanent --zone=public --add-port=9100/tcp --add-port=5353/udp 	
 firewall-cmd --permanent --add-icmp-block-inversion
 firewall-cmd --permanent --add-icmp-block=echo-reply
 firewall-cmd --permanent --add-icmp-block=echo-request
+firewall-cmd --permanent --add-port=11100/tcp
+firewall-cmd --permanent --add-port=11101/tcp
 firewall-cmd --reload
