@@ -10,6 +10,7 @@ case "$USER_GROUPS" in
         cat <<EOF > "$BOOKMARKS_FILE"
 smb://10.23.0.253/home/tanar/$USER u:
 smb://10.23.0.253/public/tanar t:
+/home/scan scan
 EOF
         ;;
     *diákok*)
