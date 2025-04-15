@@ -6,6 +6,7 @@ veyon-cli config set Authentication/Method "KeyFileAuthentication"
 
 sudo systemctl enable veyon
 
+echo "Tűzfal szabályok alkalmazása..."
 sudo firewall-cmd --permanent --add-port=11100/tcp
 sudo firewall-cmd --permanent --add-port=11101/tcp
 sudo firewall-cmd --reload
