@@ -178,8 +178,8 @@ echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /e
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /usr/bin/firewall-cmd" >> /etc/sudoers
 
-echo -e "${yellow}Create user...${white}"
-adduser user
+#echo -e "${yellow}Create user...${white}"
+#adduser user
 
 echo -e "${yellow}Samba Share...${white}"
 apt install samba smbclient cifs-utils

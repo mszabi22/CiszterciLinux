@@ -154,8 +154,8 @@ Terminal=false
 MimeType=application/x-veracrypt-volume;application/x-truecrypt-volume;" > /usr/share/applications/veracrypt.desktop
 echo "%sudo  ALL = (ALL:ALL) NOPASSWD: /usr/bin/veracrypt" >> /etc/sudoers
 ########################################################################
-echo -e "${yellow}Create user...${white}"
-adduser user
+#echo -e "${yellow}Create user...${white}"
+#adduser user
 ########################################################################
 echo -e "${yellow}Samba Share...${white}"
 apt install samba smbclient cifs-utils
