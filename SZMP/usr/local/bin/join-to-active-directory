@@ -44,3 +44,4 @@ Name=Bookmarks Setup
 Comment=Setup GTK Bookmarks for network shares
 " > /etc/xdg/autostart/bookmarks.desktop
 chmod +x /etc/xdg/autostart/bookmarks.desktop
+fi
