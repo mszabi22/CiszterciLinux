@@ -51,6 +51,9 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     audacious molly-guard kleopatra clamtk mpv smplayer ntpdate geogebra krita krita-l10n nfs-common veyon-service \
     firewalld firewall-config firewall-applet 
 
+systemctl stop firewalld
+systemctl disable firewalld
+
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 echo "Include /etc/ssh/sshd_config.d/*.conf
