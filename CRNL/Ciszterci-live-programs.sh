@@ -108,24 +108,6 @@ cat signal-desktop-keyring.gpg | tee /usr/share/keyrings/signal-desktop-keyring.
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' | tee /etc/apt/sources.list.d/signal-xenial.list
 apt update && sudo apt install signal-desktop
 
-echo -e "${yellow}Viber install...${white}"
-cd /usr/local/bin
-wget https://download.cdn.viber.com/desktop/Linux/viber.AppImage
-mv viber.AppImage viber
-chmod +x viber
-cd /usr/share/icons
-wget -O viber-logo.png https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fzh.wizcase.com%2Fwp-content%2Fuploads%2F2020%2F02%2FVIBER-LOGO-1.png&f=1&nofb=1&ipt=95f0c86d8e9533c00e85b8621237d03bae171b5e9a253152513eb3bb4fa223e1&ipo=images
-echo "[Desktop Entry]
-Name=Viber
-Exec=/usr/local/bin/viber
-Icon=/usr/share/icons/viber-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/viber.desktop  
-
 echo -e "${yellow}TeamViewer install...${white}"
 cd
 wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
