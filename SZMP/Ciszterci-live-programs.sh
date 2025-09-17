@@ -29,17 +29,12 @@ exit 0
 chmod +x /etc/rc.local
 systemctl enable rc-local
 ########################################################################
-echo -e "${yellow}Timezone setting...${white}"
-apt install chrony -y
-timedatectl set-timezone Europe/Budapest
-timedatectl set-ntp on
-########################################################################
 echo -e "${yellow}Repository setting...${white}"
-echo "deb https://ftp.debian.org/debian/ bookworm contrib main non-free non-free-firmware contrib
-deb https://ftp.debian.org/debian/ bookworm-updates contrib main non-free non-free-firmware contrib
-deb https://ftp.debian.org/debian/ bookworm-proposed-updates contrib main non-free non-free-firmware contrib
-deb https://ftp.debian.org/debian/ bookworm-backports contrib main non-free non-free-firmware contrib
-deb https://security.debian.org/debian-security/ bookworm-security contrib main non-free non-free-firmware contrib" > /etc/apt/sources.list
+echo "deb https://ftp.debian.org/debian/ trixie contrib main non-free non-free-firmware contrib
+deb https://ftp.debian.org/debian/ trixie-updates contrib main non-free non-free-firmware contrib
+deb https://ftp.debian.org/debian/ trixie-proposed-updates contrib main non-free non-free-firmware contrib
+deb https://ftp.debian.org/debian/ trixie-backports contrib main non-free non-free-firmware contrib
+deb https://security.debian.org/debian-security/ trixie-security contrib main non-free non-free-firmware contrib" > /etc/apt/sources.list
 apt update
 apt upgrade -y
 ########################################################################
@@ -116,28 +111,29 @@ dpkg -i teamviewer_amd64.deb
 apt-get -f install -y
 rm teamviewer_amd64.deb
 ########################################################################
+echo -e "${yellow}AEScrypt install...${white}"
+wget https://www.aescrypt.com/download/v4/linux/aescrypt_gui-4.3.1-Linux-x86_64.deb
+dpkg -i aescrypt_gui-*.deb
+
+########################################################################
 echo -e "${yellow}VeraCrypt install...${white}"
 cd
-wget https://launchpad.net/veracrypt/trunk/1.26.7/+download/veracrypt-1.26.7-Debian-12-amd64.deb
-dpkg -i veracrypt-1.26.7-Debian-12-amd64.deb
+wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-12-amd64.deb
+dpkg -i veracrypt-*.deb
 apt-get -f install -y
-rm veracrypt-1.26.7-Debian-12-amd64.deb
-apt-get -f install -y
+rm veracrypt-*.deb
 echo "[Desktop Entry]
 Type=Application
 Name=VeraCrypt
 GenericName=VeraCrypt volume manager
 Comment=Create and mount VeraCrypt encrypted volumes
 Icon=veracrypt
-Exec=sudo /usr/bin/veracrypt %f
+Exec=/usr/bin/veracrypt %f
 Categories=Office;
 Keywords=encryption,filesystem
 Terminal=false
 MimeType=application/x-veracrypt-volume;application/x-truecrypt-volume;" > /usr/share/applications/veracrypt.desktop
 echo "%sudo  ALL = (ALL:ALL) NOPASSWD: /usr/bin/veracrypt" >> /etc/sudoers
-########################################################################
-echo -e "${yellow}Create user...${white}"
-adduser user
 ########################################################################
 echo -e "${yellow}Samba Share...${white}"
 apt install samba smbclient cifs-utils
@@ -163,9 +159,4 @@ sudo smbpasswd -e scan
 ########################################################################
 echo -e "${yellow}root passwd...${white}"
 passwd
-########################################################################
-apt-get remove libreoffice-*
-apt autoremove -y
-echo "LibreOffice install!!!"
-echo "Veyon config!!!"
 echo -e "${green}DONE.${white}"
