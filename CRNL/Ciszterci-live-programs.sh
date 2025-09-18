@@ -159,9 +159,6 @@ echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /e
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /usr/bin/firewall-cmd" >> /etc/sudoers
 
-echo -e "${yellow}Create user...${white}"
-adduser user
-
 echo -e "${yellow}Samba Share...${white}"
 apt install samba smbclient cifs-utils
 mkdir /home/scan
@@ -184,12 +181,10 @@ echo -e "${yellow}Scan user passwd...${white}"
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
 
+echo -e "${yellow}Create user...${white}"
+adduser user
+
 echo -e "${yellow}root passwd...${white}"
 passwd
 
-
-apt-get remove libreoffice-*
-apt autoremove -y
-echo "LibreOffice install!!!"
-echo "Veyon config!!!"
 echo -e "${green}DONE.${white}"
