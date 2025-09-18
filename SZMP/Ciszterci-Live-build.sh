@@ -23,6 +23,6 @@ lb config noauto \
 	--interactive shell
  
 echo "mc network-manager net-tools wget openssh-client task-xfce-desktop xserver-xorg-core gparted ntfs-3g hfsprogs rsync dosfstools \
-partclone sshfs nano calamares calamares-settings-debian apt-utils user-setup sudo dialog" > config/package-lists/my.list.chroot
+partclone sshfs nano calamares calamares-settings-debian apt-utils user-setup sudo dialog live-config live-config-systemd" > config/package-lists/my.list.chroot
 # # #
 lb build
