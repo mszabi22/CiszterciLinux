@@ -159,6 +159,6 @@ sudo smbpasswd -e scan
 ########################################################################
 echo -e "${yellow}root passwd...${white}"
 passwd
-echo -e "${yellow}Create user...${white}"
-adduser user
+#echo -e "${yellow}Create user...${white}"
+#adduser user
 echo -e "${green}DONE.${white}"
