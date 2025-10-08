@@ -104,6 +104,40 @@ cat signal-desktop-keyring.gpg | tee /usr/share/keyrings/signal-desktop-keyring.
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' | tee /etc/apt/sources.list.d/signal-xenial.list
 apt update && sudo apt install signal-desktop
 ########################################################################
+echo -e "${yellow}RetroShare install...${white}"
+cd /usr/share/icons
+wget -O retroshare-logo.png https://retroshare.cc/img/retroshare-symbol.png
+cd /usr/local/bin
+wget -O retroshare https://github.com/RetroShare/RetroShare/releases/download/v0.6.7.2/RetroShare-0.6.7-2.glibc2.29-x86_64.AppImage
+chmod a+x retroshare
+echo "[Desktop Entry]
+Name=RetrroShare
+Exec=/usr/local/bin/retroshare
+Icon=/usr/share/icons/retroshare-logo.png
+
+Encoding=UTF-8
+ExecutionMode=normal
+Type=Application
+Categories=Network;
+Enabled=true" > /usr/share/applications/retroshare.desktop
+########################################################################
+echo -e "${yellow}SimpleX.chat install...${white}"
+cd /usr/share/icons
+wget -O simplex-logo.png https://simplex.chat/img/new/logo-dark.png
+cd /usr/local/bin
+wget -O simplex https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-desktop-x86_64.AppImage
+chmod a+x simplex
+echo "[Desktop Entry]
+Name=SimpleX Chat
+Exec=/usr/local/bin/simplex
+Icon=/usr/share/icons/simplex-logo.png
+
+Encoding=UTF-8
+ExecutionMode=normal
+Type=Application
+Categories=Network;
+Enabled=true" > /usr/share/applications/simplex.desktop
+########################################################################
 echo -e "${yellow}TeamViewer install...${white}"
 cd
 wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
