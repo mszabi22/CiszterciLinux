@@ -8,9 +8,7 @@ lb config noauto \
 	--linux-flavours amd64:amd64 \
 	--binary-images iso-hybrid \
 	--distribution trixie \
-	--debian-installer live \
-	--debian-installer-distribution trixie \
-	--debian-installer-gui true \
+	--debian-installer none \
 	--archive-areas "contrib main non-free non-free-firmware" \
 	--debootstrap-options "--variant=minbase" \
 	--bootappend-live "boot=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \

@@ -104,39 +104,41 @@ cat signal-desktop-keyring.gpg | tee /usr/share/keyrings/signal-desktop-keyring.
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' | tee /etc/apt/sources.list.d/signal-xenial.list
 apt update && sudo apt install signal-desktop
 ########################################################################
-echo -e "${yellow}RetroShare install...${white}"
-cd /usr/share/icons
-wget -O retroshare-logo.png https://retroshare.cc/img/retroshare-symbol.png
+echo -e "${yellow}Viber install...${white}"
 cd /usr/local/bin
-wget -O retroshare https://github.com/RetroShare/RetroShare/releases/download/v0.6.7.2/RetroShare-0.6.7-2.glibc2.29-x86_64.AppImage
-chmod a+x retroshare
+wget -O viber https://download.cdn.viber.com/desktop/Linux/viber.AppImage
+chmod +x viber
+
+cd /usr/share/icons
+wget -O viber-logo.png https://www.freepnglogos.com/uploads/viber-png/viber-top-way-video-call-faster-full-tronzi-6.png
+
 echo "[Desktop Entry]
-Name=RetrroShare
-Exec=/usr/local/bin/retroshare
-Icon=/usr/share/icons/retroshare-logo.png
+Name=Viber
+Exec=/usr/local/bin/viber
+Icon=/usr/share/icons/viber-logo.png
 
 Encoding=UTF-8
 ExecutionMode=normal
 Type=Application
 Categories=Network;
-Enabled=true" > /usr/share/applications/retroshare.desktop
+Enabled=true" > /usr/share/applications/viber.desktop
 ########################################################################
-echo -e "${yellow}SimpleX.chat install...${white}"
+echo -e "${yellow}Standard Notes install...${white}"
 cd /usr/share/icons
-wget -O simplex-logo.png https://simplex.chat/img/new/logo-dark.png
+wget https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/standard-notes.png
 cd /usr/local/bin
-wget -O simplex https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-desktop-x86_64.AppImage
-chmod a+x simplex
+wget -O standard-notes https://github.com/standardnotes/app/releases/download/%40standardnotes/desktop%403.201.18/standard-notes-3.201.18-linux-x86_64.AppImage
+chmod a+x standard-notes
 echo "[Desktop Entry]
-Name=SimpleX Chat
-Exec=/usr/local/bin/simplex
-Icon=/usr/share/icons/simplex-logo.png
+Name=Standard Notes
+Exec=/usr/local/bin/standard-notes
+Icon=/usr/share/icons/standard-notes-icon.png
 
 Encoding=UTF-8
 ExecutionMode=normal
 Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/simplex.desktop
+Categories=Office;
+Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
 echo -e "${yellow}TeamViewer install...${white}"
 cd
@@ -146,28 +148,25 @@ apt-get -f install -y
 rm teamviewer_amd64.deb
 ########################################################################
 echo -e "${yellow}AEScrypt install...${white}"
-wget https://www.aescrypt.com/download/v4/linux/aescrypt_gui-4.3.1-Linux-x86_64.deb
+cd
+wget https://www.aescrypt.com/download/v4/linux/aescrypt_gui-4.5.0-Linux-x86_64.deb
 dpkg -i aescrypt_gui-*.deb
-
+rm aescrypt_gui-*.deb
 ########################################################################
 echo -e "${yellow}VeraCrypt install...${white}"
-cd
-wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-12-amd64.deb
-dpkg -i veracrypt-*.deb
-apt-get -f install -y
-rm veracrypt-*.deb
-echo "[Desktop Entry]
-Type=Application
-Name=VeraCrypt
-GenericName=VeraCrypt volume manager
-Comment=Create and mount VeraCrypt encrypted volumes
-Icon=veracrypt
-Exec=/usr/bin/veracrypt %f
-Categories=Office;
-Keywords=encryption,filesystem
-Terminal=false
-MimeType=application/x-veracrypt-volume;application/x-truecrypt-volume;" > /usr/share/applications/veracrypt.desktop
+if [ `cat /etc/issue | grep 12 | wc -l` = "1" ]; then
+	wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-12-amd64.deb
+	dpkg -i veracrypt-1.26.24-Debian-12-amd64.deb
+	apt-get -f install -y
+fi
+
+if [ `cat /etc/issue | grep 13 | wc -l` = "1" ]; then
+	wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-13-amd64.deb
+	dpkg -i veracrypt-1.26.24-Debian-13-amd64.deb
+	apt-get -f install -y
+fi
 echo "%sudo  ALL = (ALL:ALL) NOPASSWD: /usr/bin/veracrypt" >> /etc/sudoers
+
 ########################################################################
 echo -e "${yellow}Samba Share...${white}"
 apt install samba smbclient cifs-utils
@@ -193,6 +192,4 @@ sudo smbpasswd -e scan
 ########################################################################
 echo -e "${yellow}root passwd...${white}"
 passwd
-echo -e "${yellow}Create user...${white}"
-adduser user
 echo -e "${green}DONE.${white}"
