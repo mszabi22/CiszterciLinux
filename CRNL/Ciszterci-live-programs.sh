@@ -43,7 +43,7 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     firmware-iwlwifi firmware-atheros firmware-brcm80211 blueman ttf-mscorefonts-installer vlc thunderbird thunderbird-l10n-hu \
     gimp simple-scan gnupg gnupg2 gnupg1 eog zstd imagemagick menulibre mugshot keepassxc geany ntpsec zenity\
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools libreoffice-l10n-hu gnome-online-accounts \
-    audacious molly-guard kleopatra clamtk mpv geogebra krita krita-l10n nfs-common veyon-service bash-completion screen
+    audacious molly-guard kleopatra clamtk mpv geogebra krita krita-l10n nfs-common veyon-service bash-completion screen birdtray
 
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak

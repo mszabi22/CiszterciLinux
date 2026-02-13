@@ -44,7 +44,7 @@ apt install -y mc sudo ssh cups printer-driver-cups-pdf gvfs-fuse gvfs-backends 
     gimp simple-scan gnupg gnupg2 gnupg1 eog zstd imagemagick alacarte menulibre mugshot keepassxc geany ntpsec zenity\
     libpam-google-authenticator gnome-system-tools wireguard wireguard-tools gnome-online-accounts \
     audacious molly-guard kleopatra clamtk mpv krita krita-l10n nfs-common libreoffice-l10n-hu \
-    veyon-service bash-completion screen
+    veyon-service bash-completion screen birdtray
 ########################################################################
 echo -e "${yellow}SSH setting...${white}"
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
