@@ -216,3 +216,5 @@ echo -e "${yellow}root passwd...${white}"
 passwd
 
 echo -e "${green}DONE.${white}"
+
+echo -e "${green}LibreOffice?${white}"
