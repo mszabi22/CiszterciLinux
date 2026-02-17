@@ -131,7 +131,7 @@ chmod a+x standard-notes
 echo "[Desktop Entry]
 Name=Standard Notes
 Exec=/usr/local/bin/standard-notes
-Icon=/usr/share/icons/standard-notes-icon.png
+Icon=/usr/share/icons/standard-notes.png
 
 Encoding=UTF-8
 ExecutionMode=normal
@@ -215,6 +215,8 @@ sudo smbpasswd -e scan
 echo -e "${yellow}root passwd...${white}"
 passwd
 
+#echo -e "${yellow}Live user...${white}"
+#sudo useradd live
 echo -e "${green}DONE.${white}"
 
 echo -e "${green}LibreOffice?${white}"
