@@ -215,8 +215,6 @@ sudo smbpasswd -e scan
 echo -e "${yellow}root passwd...${white}"
 passwd
 
-echo -e "${yellow}Live user...${white}"
-sudo useradd live
 echo -e "${green}DONE.${white}"
 
 echo -e "${green}LibreOffice?${white}"
