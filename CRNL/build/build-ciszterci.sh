@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-WORKDIR="CL"
+WORKDIR="CL-CRNL"
 ISO_NAME="CiszterciLinux"
 
 apt-get update
@@ -68,6 +68,17 @@ veyon-service
 bash-completion screen
 samba smbclient cifs-utils
 clamtk
+ssh
+apt-transport-https
+ttf-mscorefonts-installer
+gnupg1
+libpam-google-authenticator
+gnome-system-tools
+gnome-online-accounts
+molly-guard
+kleopatra
+geogebra
+birdtray
 EOF
 
 # live user
@@ -139,12 +150,23 @@ wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
 dpkg -i teamviewer_amd64.deb || apt -f install -y
 rm teamviewer_amd64.deb
 
+# AEScrypt install
+wget https://www.aescrypt.com/download/v4/linux/aescrypt_gui-4.5.0-Linux-x86_64.deb
+dpkg -i aescrypt_gui-*.deb
+rm aescrypt_gui-*.deb
+
 # VeraCrypt (Debian 13 = Trixie)
 wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-13-amd64.deb
 dpkg -i veracrypt-1.26.24-Debian-13-amd64.deb || apt -f install -y
 echo "%sudo ALL=(ALL) NOPASSWD:/usr/bin/veracrypt" >> /etc/sudoers
 
 # Samba share
+sudo groupadd smbshare
+sudo chgrp -R smbshare /home/scan
+sudo chmod 2775 /home/scan
+sudo useradd -M -s /sbin/nologin scan
+sudo usermod -aG smbshare scan
+
 mkdir -p /home/scan
 chmod 2775 /home/scan
 groupadd -f smbshare
