@@ -209,7 +209,8 @@ sudo useradd -M -s /sbin/nologin scan
 sudo usermod -aG smbshare scan
 
 echo -e "${yellow}Scan user passwd...${white}"
-(echo q2w3e4r5; echo q2w3e4r5) | smbpasswd -s -a scan
+sudo smbpasswd -a scan
+sudo smbpasswd -e scan
 
 echo -e "${yellow}root passwd...${white}"
 echo "root:admin" | chpasswd

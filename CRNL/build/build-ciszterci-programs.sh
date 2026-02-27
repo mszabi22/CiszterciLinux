@@ -98,7 +98,9 @@ echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /e
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
 echo -e "${yellow}Scan user passwd...${white}"
-(echo q2w3e4r5; echo q2w3e4r5) | smbpasswd -s -a scan
+sudo smbpasswd -a scan
+sudo smbpasswd -e scan
+
 
 echo -e "${yellow}root passwd...${white}"
 echo "root:admin" | chpasswd
