@@ -219,3 +219,4 @@ echo -e "${green}DONE.${white}"
 
 echo -e "${green}LibreOffice?${white}"
 echo -e "${green}Background??${white}"
+echo -e "${green}skel??${white}"
