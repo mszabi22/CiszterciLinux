@@ -11,7 +11,7 @@ lb config noauto \
 	--debian-installer none \
 	--archive-areas "contrib main non-free non-free-firmware" \
 	--debootstrap-options "--variant=minbase" \
-	--bootappend-live "boot=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest live-config.username=live live-config.user-default-groups=audio,cdrom,dip,floppy,video,plugdev,netdev,sudo" \
+	--bootappend-live "boot=live components persistence username=live user-default-groups=audio,cdrom,video,plugdev,netdev,sudo hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
 	--image-name "CiszterciLinux" \
 	--iso-application CiszterciLinux \
 	--iso-preparer `date +%Y.%m.%d.` \

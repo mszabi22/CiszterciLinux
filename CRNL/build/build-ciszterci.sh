@@ -22,7 +22,7 @@ lb config noauto \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debootstrap-options "--variant=minbase" \
-  --bootappend-live "boot=live components persistence hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
+  --bootappend-live "boot=live components persistence username=live user-default-groups=audio,cdrom,video,plugdev,netdev,sudo hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
   --image-name "$ISO_NAME" \
   --iso-application "$ISO_NAME" \
   --iso-publisher "Sleepy.hu" \
@@ -68,7 +68,7 @@ veyon-service
 bash-completion screen
 samba smbclient cifs-utils
 clamtk
-ssh
+openssh-server
 apt-transport-https
 ttf-mscorefonts-installer
 gnupg1
@@ -79,14 +79,10 @@ molly-guard
 kleopatra
 geogebra
 birdtray
-EOF
-
-# live user
-mkdir -p config/includes.chroot/etc/live/config.conf.d
-cat > config/includes.chroot/etc/live/config.conf.d/00-user.conf <<EOF
-LIVE_USERNAME="live"
-LIVE_USER_DEFAULT_GROUPS="audio cdrom dip floppy video plugdev netdev sudo"
-LIVE_USER_PASSWORD="live"
+policykit-1
+dbus-user-session
+accountsservice
+xfce4-session
 EOF
 
 # autologin
@@ -104,6 +100,8 @@ cat > config/hooks/normal/999-full.hook.chroot <<'EOF'
 #!/bin/bash
 set -e
 export DEBIAN_FRONTEND=noninteractive
+
+echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
 
 # repo
 cat > /etc/apt/sources.list <<REPO
@@ -158,19 +156,21 @@ rm aescrypt_gui-*.deb
 # VeraCrypt (Debian 13 = Trixie)
 wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-13-amd64.deb
 dpkg -i veracrypt-1.26.24-Debian-13-amd64.deb || apt -f install -y
-echo "%sudo ALL=(ALL) NOPASSWD:/usr/bin/veracrypt" >> /etc/sudoers
+
+echo "%sudo ALL=(ALL) NOPASSWD:/usr/bin/veracrypt" > /etc/sudoers.d/veracrypt
+chmod 440 /etc/sudoers.d/veracrypt
 
 # Samba share
-sudo groupadd smbshare
-sudo chgrp -R smbshare /home/scan
-sudo chmod 2775 /home/scan
-sudo useradd -M -s /sbin/nologin scan
-sudo usermod -aG smbshare scan
-
 mkdir -p /home/scan
 chmod 2775 /home/scan
 groupadd -f smbshare
 chgrp smbshare /home/scan
+chgrp -R smbshare /home/scan
+chmod 2775 /home/scan
+useradd -M -s /usr/sbin/nologin scan
+usermod -aG smbshare scan
+
+
 cat >> /etc/samba/smb.conf <<SAMBA
 
 [scan]
@@ -180,6 +180,8 @@ cat >> /etc/samba/smb.conf <<SAMBA
    force create mode = 775
    force directory mode = 775
 SAMBA
+
+
 
 echo "== FULL BUILD DONE =="
 EOF
@@ -199,3 +201,7 @@ lb build
 echo
 echo "ISO kész:"
 ls -lh *.iso
+
+### javítás: ###
+#lb clean --binary
+#lb binary
