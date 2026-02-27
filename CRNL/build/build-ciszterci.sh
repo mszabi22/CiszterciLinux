@@ -22,7 +22,7 @@ lb config noauto \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debootstrap-options "--variant=minbase" \
-  --bootappend-live "boot=live components persistence username=live user-default-groups=audio,cdrom,video,plugdev,netdev,sudo hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
+  --bootappend-live "boot=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
   --image-name "$ISO_NAME" \
   --iso-application "$ISO_NAME" \
   --iso-publisher "Sleepy.hu" \
@@ -181,6 +181,11 @@ cat >> /etc/samba/smb.conf <<SAMBA
    force directory mode = 775
 SAMBA
 
+# Live user
+id -u live >/dev/null 2>&1 || useradd -m -s /bin/bash -G audio,cdrom,dip,floppy,video,plugdev,netdev,sudo live
+echo "live:live" | chpasswd
+chmod 700 /home/live
+chown -R live:live /home/live
 
 
 echo "== FULL BUILD DONE =="
