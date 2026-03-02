@@ -193,6 +193,7 @@ wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-D
 dpkg -i veracrypt-1.26.24-Debian-13-amd64.deb || apt -f install -y
 echo "%sudo ALL=(ALL) NOPASSWD:/usr/bin/veracrypt" > /etc/sudoers.d/veracrypt
 chmod 440 /etc/sudoers.d/veracrypt
+rm -rf veracrypt-*
 
 # # #
 # Samba share
