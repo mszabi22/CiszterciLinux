@@ -80,6 +80,7 @@ kleopatra
 geogebra
 birdtray
 polkitd
+pkexec
 dbus-user-session
 accountsservice
 xfce4-session
