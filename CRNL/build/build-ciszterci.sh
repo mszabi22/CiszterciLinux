@@ -210,5 +210,6 @@ echo "ISO kész:"
 ls -lh *.iso
 
 ### javítás: ###
+#sudo chroot chroot /bin/bash
 #lb clean --binary
 #lb binary
