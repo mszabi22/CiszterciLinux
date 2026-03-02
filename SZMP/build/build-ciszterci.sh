@@ -22,7 +22,7 @@ lb config noauto \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debootstrap-options "--variant=minbase" \
-  --bootappend-live "boot=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
+  --bootappend-live "boot=live username=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
   --image-name "$ISO_NAME" \
   --iso-application "$ISO_NAME" \
   --iso-publisher "Sleepy.hu" \
@@ -209,5 +209,6 @@ echo "ISO kész:"
 ls -lh *.iso
 
 ### javítás: ###
+#sudo chroot chroot /bin/bash
 #lb clean --binary
 #lb binary
