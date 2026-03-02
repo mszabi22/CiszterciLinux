@@ -86,6 +86,24 @@ accountsservice
 xfce4-session
 EOF
 
+mkdir -p config/includes.binary/boot/grub
+cat > config/includes.binary/boot/grub/grub.cfg << EOF
+if loadfont /boot/grub/font.pf2 ; then
+  set gfxmode=auto
+  insmod gfxterm
+  insmod png
+  terminal_output gfxterm
+fi
+
+if background_image /boot/grub/background.png; then
+  set color_normal=white/black
+  set color_highlight=black/light-gray
+else
+  set menu_color_normal=white/black
+  set menu_color_highlight=black/light-gray
+fi
+EOF
+
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
 cat > config/includes.chroot/etc/lightdm/lightdm.conf.d/01-autologin.conf <<EOF
