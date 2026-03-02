@@ -86,26 +86,33 @@ accountsservice
 xfce4-session
 EOF
 
-# egyedi GRUB háttér
+# grub
 mkdir -p config/includes.binary/boot/grub
-mkdir -p config/hooks/binary/
-cp /home/majorsza/git/mszabi22/CiszterciLinux/SZMP/boot/grub/background.png config/includes.binary/boot/grub/
+cp /home/majorsza/git/mszabi22/CiszterciLinux/SZMP/boot/grub/background.png \
+   config/includes.binary/boot/grub/
+
+mkdir -p config/hooks/binary
+
 cat > config/hooks/binary/999-grub-background.hook.binary << 'EOF'
 #!/bin/sh
 set -e
 
-GRUB_CFG="binary/boot/grub/grub.cfg"
+CFG="binary/boot/grub/grub.cfg"
 
-if [ -f "$GRUB_CFG" ]; then
-    sed -i '1i\
-insmod png\
-background_image /boot/grub/background.png\
-set color_normal=white/black\
-set color_highlight=black/light-gray\
-' "$GRUB_CFG"
+if [ -f "$CFG" ]; then
+  sed -i '1i\
+insmod png\n\
+insmod gfxterm\n\
+terminal_output gfxterm\n\
+background_image /boot/grub/background.png\n\
+set color_normal=white/black\n\
+set color_highlight=black/light-gray\n\
+' "$CFG"
 fi
 EOF
-chmod +x config/hooks/binary/999-grub-background.hook.binary
+
+chmod +x config/hooks/binary/999-grub-background.hook.binary   
+   
 
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
