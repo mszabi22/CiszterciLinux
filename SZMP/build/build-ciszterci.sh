@@ -79,7 +79,7 @@ molly-guard
 kleopatra
 geogebra
 birdtray
-policykit-1
+polkitd
 dbus-user-session
 accountsservice
 xfce4-session
