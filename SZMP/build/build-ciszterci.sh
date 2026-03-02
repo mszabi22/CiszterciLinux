@@ -88,22 +88,24 @@ EOF
 
 # egyedi GRUB háttér
 mkdir -p config/includes.binary/boot/grub
-cat > config/includes.binary/boot/grub/grub.cfg << EOF
-if loadfont /boot/grub/font.pf2 ; then
-  set gfxmode=auto
-  insmod gfxterm
-  insmod png
-  terminal_output gfxterm
-fi
+mkdir -p config/hooks/binary/
+cp /home/majorsza/git/mszabi22/CiszterciLinux/SZMP/boot/grub/background.png config/includes.binary/boot/grub/
+cat > config/hooks/binary/999-grub-background.hook.binary << 'EOF'
+#!/bin/sh
+set -e
 
-if background_image /boot/grub/background.png; then
-  set color_normal=white/black
-  set color_highlight=black/light-gray
-else
-  set menu_color_normal=white/black
-  set menu_color_highlight=black/light-gray
+GRUB_CFG="binary/boot/grub/grub.cfg"
+
+if [ -f "$GRUB_CFG" ]; then
+    sed -i '1i\
+insmod png\
+background_image /boot/grub/background.png\
+set color_normal=white/black\
+set color_highlight=black/light-gray\
+' "$GRUB_CFG"
 fi
 EOF
+chmod +x config/hooks/binary/999-grub-background.hook.binary
 
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
