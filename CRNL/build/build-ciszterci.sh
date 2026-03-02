@@ -87,23 +87,32 @@ xfce4-session
 EOF
 
 # grub
-mkdir -p config/includes.binary/boot/grub/live-theme
-cat > config/includes.binary/boot/grub/live-theme/theme.txt<<EOF
-title-text: ""
-desktop-image: "background.png"
+mkdir -p config/includes.binary/boot/grub
+cp /home/majorsza/git/mszabi22/CiszterciLinux/CRNL/boot/grub/background.png \
+   config/includes.binary/boot/grub/
 
-+ boot_menu {
-    left = 10%
-    width = 80%
-    top = 20%
-    height = 60%
-    item_font = "DejaVu Sans 16"
-    item_color = "white"
-    selected_item_color = "black"
-    selected_item_bg_color = "light-gray"
-}
+mkdir -p config/hooks/binary
+
+cat > config/hooks/binary/999-grub-background.hook.binary << 'EOF'
+#!/bin/sh
+set -e
+
+CFG="binary/boot/grub/grub.cfg"
+
+if [ -f "$CFG" ]; then
+  sed -i '1i\
+insmod png\n\
+insmod gfxterm\n\
+terminal_output gfxterm\n\
+background_image /boot/grub/background.png\n\
+set color_normal=white/black\n\
+set color_highlight=black/light-gray\n\
+' "$CFG"
+fi
 EOF
-cp /home/majorsza/git/mszabi22/CiszterciLinux/CRNL/boot/grub/background.png config/includes.binary/boot/grub/background.png
+
+chmod +x config/hooks/binary/999-grub-background.hook.binary   
+   
 
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
