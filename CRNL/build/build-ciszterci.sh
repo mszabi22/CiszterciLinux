@@ -86,6 +86,26 @@ accountsservice
 xfce4-session
 EOF
 
+# grub
+mkdir -p config/includes.binary/boot/grub
+cp /home/majorsza/git/mszabi22/CiszterciLinux/CRNL/boot/grub/background.png config/includes.binary/boot/grub/background.png
+cat > config/hooks/normal/9999-grub-background.hook.chroot <<EOF
+#!/bin/sh
+set -e
+
+GRUB_CFG="/boot/grub/grub.cfg"
+
+if [ -f "$GRUB_CFG" ]; then
+    sed -i '1i\
+insmod png\n\
+if background_image /boot/grub/background.png; then\n\
+  set color_normal=white/black\n\
+  set color_highlight=black/light-gray\n\
+fi\n' "$GRUB_CFG"
+fi
+EOF
+chmod +x config/hooks/normal/9999-grub-background.hook.chroot
+
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
 cat > config/includes.chroot/etc/lightdm/lightdm.conf.d/01-autologin.conf <<EOF
