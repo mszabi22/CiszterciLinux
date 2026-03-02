@@ -86,6 +86,7 @@ accountsservice
 xfce4-session
 EOF
 
+# egyedi GRUB háttér
 mkdir -p config/includes.binary/boot/grub
 cat > config/includes.binary/boot/grub/grub.cfg << EOF
 if loadfont /boot/grub/font.pf2 ; then
