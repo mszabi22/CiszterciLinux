@@ -41,34 +41,9 @@ Type=Application
 Categories=Office;
 Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
-echo -e "${yellow}XAMPP install...${white}"
-wget -O xampp.run https://sourceforge.net/projects/xampp/files/XAMPP%20Linux/8.2.12/xampp-linux-x64-8.2.12-0-installer.run/download
-chmod +x xampp.run
-./xampp.run
-rm -rf xampp.run
-chmod +x /opt/lampp/manager-linux-x64.run
-
-cd /usr/share/icons
-wget -O xampp-logo.png https://cdn.freelogovectors.net/wp-content/uploads/2021/02/xampp-logo-freelogovectors.net_.png
-echo "[Desktop Entry]
-Name=XAMPP
-Exec=sudo /opt/lampp/manager-linux-x64.run
-Icon=/usr/share/icons/xampp-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/xampp.desktop 	
-echo "%sudo ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
-echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
-echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
-
-########################################################################
 echo -e "${yellow}Scan user passwd...${white}"
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
-
 
 echo -e "${yellow}root passwd...${white}"
 echo "root:admin" | chpasswd

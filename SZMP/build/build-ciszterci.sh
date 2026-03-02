@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-WORKDIR="CL-CRNL"
+WORKDIR="CL-SZMP"
 ISO_NAME="CiszterciLinux"
 
 apt-get update
