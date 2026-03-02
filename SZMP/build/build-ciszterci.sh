@@ -86,34 +86,6 @@ accountsservice
 xfce4-session
 EOF
 
-# grub
-mkdir -p config/includes.binary/boot/grub
-cp /home/majorsza/git/mszabi22/CiszterciLinux/SZMP/boot/grub/background.png \
-   config/includes.binary/boot/grub/
-
-mkdir -p config/hooks/binary
-
-cat > config/hooks/binary/999-grub-background.hook.binary << 'EOF'
-#!/bin/sh
-set -e
-
-CFG="binary/boot/grub/grub.cfg"
-
-if [ -f "$CFG" ]; then
-  sed -i '1i\
-insmod png\n\
-insmod gfxterm\n\
-terminal_output gfxterm\n\
-background_image /boot/grub/background.png\n\
-set color_normal=white/black\n\
-set color_highlight=black/light-gray\n\
-' "$CFG"
-fi
-EOF
-
-chmod +x config/hooks/binary/999-grub-background.hook.binary   
-   
-
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
 cat > config/includes.chroot/etc/lightdm/lightdm.conf.d/01-autologin.conf <<EOF
