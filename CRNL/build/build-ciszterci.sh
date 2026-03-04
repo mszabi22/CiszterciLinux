@@ -84,6 +84,10 @@ pkexec
 dbus-user-session
 accountsservice
 xfce4-session
+qrencode
+onionshare
+fastfetch
+gocryptfs
 EOF
 
 # autologin
