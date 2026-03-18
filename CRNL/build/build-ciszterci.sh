@@ -78,6 +78,7 @@ imagemagick
 zstd
 
 menulibre
+alacarte
 mugshot
 keepassxc
 geany
@@ -111,6 +112,7 @@ libpam-google-authenticator
 
 gnome-system-tools
 gnome-online-accounts
+gnome-calendar
 
 kleopatra
 geogebra
@@ -123,8 +125,9 @@ accountsservice
 xfce4-session
 
 htop
+
 onionshare
-fastfetch
+
 git
 
 deluge
@@ -132,9 +135,7 @@ syncthing
 qrencode
 qreator
 ecryptfs-utils
-
 ffmpeg
-
 
 greybird-gtk-theme
 elementary-xfce-icon-theme
@@ -165,10 +166,15 @@ echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select t
 
 # repo
 cat > /etc/apt/sources.list <<REPO
-deb https://ftp.debian.org/debian trixie main contrib non-free non-free-firmware
-deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
-deb https://ftp.debian.org/debian trixie-updates main contrib non-free non-free-firmware
-deb https://ftp.debian.org/debian trixie-backports main contrib non-free non-free-firmware
+#deb https://ftp.debian.org/debian trixie main contrib non-free non-free-firmware
+#deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+#deb https://ftp.debian.org/debian trixie-updates main contrib non-free non-free-firmware
+#deb https://ftp.debian.org/debian trixie-backports main contrib non-free non-free-firmware
+
+# # # Sleepy.hu MIRROR
+deb https://mirror.sleepy.hu/debian trixie main contrib non-free non-free-firmware
+deb https://mirror.sleepy.hu/debian-security trixie-security main contrib non-free non-free-firmware
+deb http://mirror.sleepy.hu/debian trixie-backports main contrib non-free non-free-firmware
 REPO
 
 apt update
@@ -242,8 +248,8 @@ echo
 lb build
 
 echo
-echo "ISO kész:"
 DATUM=`date +%Y.%m.%d`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-$DATUM-amd64.iso; md5sum CiszterciLinux-$DATUM-amd64.iso > CiszterciLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
+echo "ISO kész:"
 ls -lh *.iso
 
 ### javítás: ###
