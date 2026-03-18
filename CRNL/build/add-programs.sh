@@ -74,6 +74,26 @@ echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /e
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 
 ########################################################################
+# # #
+# Samba share
+mkdir -p /home/scan
+chmod 2775 /home/scan
+groupadd -f smbshare
+chgrp smbshare /home/scan
+chgrp -R smbshare /home/scan
+chmod 2775 /home/scan
+useradd -M -s /usr/sbin/nologin -u 1100 scan
+usermod -aG smbshare scan
+cat >> /etc/samba/smb.conf <<SAMBA
+
+[scan]
+   path = /home/scan
+   writable = yes
+   guest ok = yes
+   force create mode = 775
+   force directory mode = 775
+SAMBA
+
 echo -e "${yellow}Scan user passwd...${white}"
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan

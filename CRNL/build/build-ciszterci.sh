@@ -227,26 +227,6 @@ chmod 440 /etc/sudoers.d/veracrypt
 rm -rf veracrypt-*
 
 # # #
-# Samba share
-mkdir -p /home/scan
-chmod 2775 /home/scan
-groupadd -f smbshare
-chgrp smbshare /home/scan
-chgrp -R smbshare /home/scan
-chmod 2775 /home/scan
-useradd -M -s /usr/sbin/nologin scan
-usermod -aG smbshare scan
-cat >> /etc/samba/smb.conf <<SAMBA
-
-[scan]
-   path = /home/scan
-   writable = yes
-   guest ok = yes
-   force create mode = 775
-   force directory mode = 775
-SAMBA
-
-# # #
 # Live user
 #id -u live >/dev/null 2>&1 || useradd -m -s /bin/bash -G audio,cdrom,dip,floppy,video,plugdev,netdev,sudo live
 #echo "live:live" | chpasswd
