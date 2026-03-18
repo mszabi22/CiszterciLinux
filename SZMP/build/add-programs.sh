@@ -5,24 +5,34 @@ blue='\e[0;34m'
 yellow='\e[0;33m'
 white='\e[0;37m'
 
-echo -e "${yellow}Viber install...${white}"
-cd /usr/local/bin
-wget -O viber https://download.cdn.viber.com/desktop/Linux/viber.AppImage
-chmod +x viber
+########################################################################
+echo -e "${yellow}rc-local setting...${white}"
+echo '[Unit]
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
+ 
+[Service]
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
 
-cd /usr/share/icons
-wget -O viber-logo.png https://www.freepnglogos.com/uploads/viber-png/viber-top-way-video-call-faster-full-tronzi-6.png
+[Install]
+WantedBy=multi-user.target' > /etc/systemd/system/rc-local.service
 
-echo "[Desktop Entry]
-Name=Viber
-Exec=/usr/local/bin/viber
-Icon=/usr/share/icons/viber-logo.png
+echo '#!/bin/sh -e
+exit 0
+' > /etc/rc.local
 
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/viber.desktop
+chmod +x /etc/rc.local
+systemctl enable rc-local
+########################################################################
+echo -e "${yellow}LocalSend install...${white}"
+wget https://github.com/localsend/localsend/releases/download/v1.17.0/LocalSend-1.17.0-linux-x86-64.deb
+dpkg -i LocalSend-1.17.0-linux-x86-64.deb || apt-get -f install -y
+rm LocalSend-1.17.0-linux-x86-64.deb        
 ########################################################################
 echo -e "${yellow}Standard Notes install...${white}"
 cd /usr/share/icons
@@ -41,6 +51,26 @@ Type=Application
 Categories=Office;
 Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
+# # #
+# Samba share
+mkdir -p /home/scan
+chmod 2775 /home/scan
+groupadd -f smbshare
+chgrp smbshare /home/scan
+chgrp -R smbshare /home/scan
+chmod 2775 /home/scan
+useradd -M -s /usr/sbin/nologin -u 1100 scan
+usermod -aG smbshare scan
+cat >> /etc/samba/smb.conf <<SAMBA
+
+[scan]
+   path = /home/scan
+   writable = yes
+   guest ok = yes
+   force create mode = 775
+   force directory mode = 775
+SAMBA
+
 echo -e "${yellow}Scan user passwd...${white}"
 sudo smbpasswd -a scan
 sudo smbpasswd -e scan
@@ -48,6 +78,3 @@ sudo smbpasswd -e scan
 echo -e "${yellow}root passwd...${white}"
 echo "root:admin" | chpasswd
 
-#echo -e "${yellow}LIVE user sync...${white}"
-#rsync -avz --delete /etc/skel/ /home/live/
-#chown -R live:live /home/live/
