@@ -46,47 +46,102 @@ lightdm
 lightdm-gtk-greeter
 xserver-xorg-core
 network-manager
-mc nano wget curl rsync
-apt-utils dialog
-calamares calamares-settings-debian
-cups printer-driver-cups-pdf
-gvfs-fuse gvfs-backends
-firmware-iwlwifi firmware-atheros firmware-brcm80211
+
+mc
+nano
+wget
+curl
+rsync
+apt-utils
+dialog
+
+calamares
+calamares-settings-debian
+
+cups
+printer-driver-cups-pdf
+gvfs-fuse
+gvfs-backends
+
+firmware-iwlwifi
+firmware-atheros
+firmware-brcm80211
+
 blueman
-vlc thunderbird thunderbird-l10n-hu
-gimp simple-scan eog
-imagemagick zstd
-menulibre mugshot keepassxc geany
-ntpsec zenity
-gnupg gnupg2
-wireguard wireguard-tools
-libreoffice libreoffice-l10n-hu
-audacious mpv
-krita krita-l10n
+vlc
+thunderbird
+thunderbird-l10n-hu
+gimp
+simple-scan
+eog
+imagemagick
+zstd
+
+menulibre
+mugshot
+keepassxc
+geany
+
+ntpsec
+zenity
+
+gnupg
+
+wireguard
+wireguard-tools
+
+libreoffice
+libreoffice-l10n-hu
+
+audacious
+
 nfs-common
-veyon-service
-bash-completion screen
-samba smbclient cifs-utils
-clamtk
+
+bash-completion
+screen
+
+samba
+smbclient
+cifs-utils
+
 openssh-server
 apt-transport-https
 ttf-mscorefonts-installer
-gnupg1
 libpam-google-authenticator
+
 gnome-system-tools
 gnome-online-accounts
-molly-guard
+
 kleopatra
 geogebra
 birdtray
+
 polkitd
 pkexec
 dbus-user-session
 accountsservice
 xfce4-session
-qrencode
+
+htop
 onionshare
 fastfetch
+git
+
+deluge
+syncthing
+qrencode
+qreator
+ecryptfs-utils
+
+ffmpeg
+
+
+greybird-gtk-theme
+elementary-xfce-icon-theme
+adwaita-icon-theme
+tango-icon-theme
+xfwm4-theme-breeze
+
 gocryptfs
 EOF
 

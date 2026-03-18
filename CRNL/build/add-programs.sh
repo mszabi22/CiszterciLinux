@@ -4,25 +4,34 @@ green='\e[0;32m'
 blue='\e[0;34m'
 yellow='\e[0;33m'
 white='\e[0;37m'
+########################################################################
+echo -e "${yellow}rc-local setting...${white}"
+echo '[Unit]
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
+ 
+[Service]
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
 
-echo -e "${yellow}Viber install...${white}"
-cd /usr/local/bin
-wget -O viber https://download.cdn.viber.com/desktop/Linux/viber.AppImage
-chmod +x viber
+[Install]
+WantedBy=multi-user.target' > /etc/systemd/system/rc-local.service
 
-cd /usr/share/icons
-wget -O viber-logo.png https://www.freepnglogos.com/uploads/viber-png/viber-top-way-video-call-faster-full-tronzi-6.png
+echo '#!/bin/sh -e
+exit 0
+' > /etc/rc.local
 
-echo "[Desktop Entry]
-Name=Viber
-Exec=/usr/local/bin/viber
-Icon=/usr/share/icons/viber-logo.png
-
-Encoding=UTF-8
-ExecutionMode=normal
-Type=Application
-Categories=Network;
-Enabled=true" > /usr/share/applications/viber.desktop
+chmod +x /etc/rc.local
+systemctl enable rc-local
+########################################################################
+echo -e "${yellow}LocalSend install...${white}"
+wget https://github.com/localsend/localsend/releases/download/v1.17.0/LocalSend-1.17.0-linux-x86-64.deb
+dpkg -i LocalSend-1.17.0-linux-x86-64.deb || apt-get -f install -y
+rm LocalSend-1.17.0-linux-x86-64.deb        
 ########################################################################
 echo -e "${yellow}Standard Notes install...${white}"
 cd /usr/share/icons
