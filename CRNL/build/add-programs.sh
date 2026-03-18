@@ -101,8 +101,4 @@ sudo smbpasswd -e scan
 echo -e "${yellow}root passwd...${white}"
 echo "root:admin" | chpasswd
 
-#echo -e "${yellow}LIVE user sync...${white}"
-#rsync -avz --delete /etc/skel/ /home/live/
-#chown -R live:live /home/live/
-
 rm /etc/debian_chroot
