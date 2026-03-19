@@ -77,8 +77,6 @@ eog
 imagemagick
 zstd
 
-menulibre
-alacarte
 mugshot
 keepassxc
 geany
@@ -127,15 +125,15 @@ xfce4-session
 htop
 
 onionshare
-
+fastfetch
 git
-
 deluge
 syncthing
 qrencode
 qreator
 ecryptfs-utils
 ffmpeg
+bleachbit
 
 greybird-gtk-theme
 elementary-xfce-icon-theme
@@ -166,15 +164,10 @@ echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select t
 
 # repo
 cat > /etc/apt/sources.list <<REPO
-#deb https://ftp.debian.org/debian trixie main contrib non-free non-free-firmware
-#deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
-#deb https://ftp.debian.org/debian trixie-updates main contrib non-free non-free-firmware
-#deb https://ftp.debian.org/debian trixie-backports main contrib non-free non-free-firmware
-
-# # # Sleepy.hu MIRROR
-deb https://mirror.sleepy.hu/debian trixie main contrib non-free non-free-firmware
-deb https://mirror.sleepy.hu/debian-security trixie-security main contrib non-free non-free-firmware
-deb http://mirror.sleepy.hu/debian trixie-backports main contrib non-free non-free-firmware
+deb https://ftp.debian.org/debian trixie main contrib non-free non-free-firmware
+deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb https://ftp.debian.org/debian trixie-updates main contrib non-free non-free-firmware
+deb https://ftp.debian.org/debian trixie-backports main contrib non-free non-free-firmware
 REPO
 
 apt update
@@ -233,6 +226,13 @@ chmod 440 /etc/sudoers.d/veracrypt
 rm -rf veracrypt-*
 
 # # #
+# Live user
+#id -u live >/dev/null 2>&1 || useradd -m -s /bin/bash -G audio,cdrom,dip,floppy,video,plugdev,netdev,sudo live
+#echo "live:live" | chpasswd
+#chmod 700 /home/live
+#chown -R live:live /home/live
+
+# # #
 echo "== FULL BUILD DONE =="
 EOF
 chmod +x config/hooks/normal/999-full.hook.chroot
@@ -248,7 +248,7 @@ echo
 lb build
 
 echo
-DATUM=`date +%Y.%m.%d`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-$DATUM-amd64.iso; md5sum CiszterciLinux-$DATUM-amd64.iso > CiszterciLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
+DATUM=`date +%Y.%m.%d`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-CRNL-$DATUM-amd64.iso; md5sum CiszterciLinux-CRNL-$DATUM-amd64.iso > CiszterciLinux-CRNL-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
 echo "ISO kész:"
 ls -lh *.iso
 

@@ -32,6 +32,7 @@ echo -e "${yellow}LocalSend install...${white}"
 wget https://github.com/localsend/localsend/releases/download/v1.17.0/LocalSend-1.17.0-linux-x86-64.deb
 dpkg -i LocalSend-1.17.0-linux-x86-64.deb || apt-get -f install -y
 rm LocalSend-1.17.0-linux-x86-64.deb        
+
 ########################################################################
 echo -e "${yellow}Standard Notes install...${white}"
 cd /usr/share/icons
@@ -72,40 +73,9 @@ Enabled=true" > /usr/share/applications/xampp.desktop
 echo "%sudo ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%diákok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
 echo "%tanárok ALL = (ALL:ALL) NOPASSWD: /opt/lampp/manager-linux-x64.run" >> /etc/sudoers
-
 ########################################################################
-# # #
-# Samba share
-mkdir -p /home/scan
-chmod 2775 /home/scan
-groupadd -f smbshare
-chgrp smbshare /home/scan
-chgrp -R smbshare /home/scan
-chmod 2775 /home/scan
-useradd -M -s /usr/sbin/nologin -u 1100 scan
-usermod -aG smbshare scan
-cat >> /etc/samba/smb.conf <<SAMBA
-
-[scan]
-   path = /home/scan
-   writable = yes
-   guest ok = yes
-   force create mode = 775
-   force directory mode = 775
-SAMBA
-
-echo -e "${yellow}Scan user passwd...${white}"
-sudo smbpasswd -a scan
-sudo smbpasswd -e scan
-
 echo -e "${yellow}root passwd...${white}"
-echo "root:admin" | chpasswd
-
-# # #
-# Live user
-id -u live >/dev/null 2>&1 || useradd -m -s /bin/bash -G audio,cdrom,dip,floppy,video,plugdev,netdev,sudo live
-echo "live:live" | chpasswd
-chmod 700 /home/live
-chown -R live:live /home/live
+passwd
 
 rm /etc/debian_chroot
+
