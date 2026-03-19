@@ -78,4 +78,6 @@ echo -e "${yellow}root passwd...${white}"
 passwd
 
 rm /etc/debian_chroot
+rm /root/add-programs.sh
+history -c
 
