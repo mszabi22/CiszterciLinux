@@ -4,7 +4,6 @@ green='\e[0;32m'
 blue='\e[0;34m'
 yellow='\e[0;33m'
 white='\e[0;37m'
-
 ########################################################################
 echo -e "${yellow}rc-local setting...${white}"
 echo '[Unit]
@@ -33,6 +32,7 @@ echo -e "${yellow}LocalSend install...${white}"
 wget https://github.com/localsend/localsend/releases/download/v1.17.0/LocalSend-1.17.0-linux-x86-64.deb
 dpkg -i LocalSend-1.17.0-linux-x86-64.deb || apt-get -f install -y
 rm LocalSend-1.17.0-linux-x86-64.deb        
+
 ########################################################################
 echo -e "${yellow}Standard Notes install...${white}"
 cd /usr/share/icons
@@ -51,30 +51,12 @@ Type=Application
 Categories=Office;
 Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
-# # #
-# Samba share
-mkdir -p /home/scan
-chmod 2775 /home/scan
-groupadd -f smbshare
-chgrp smbshare /home/scan
-chgrp -R smbshare /home/scan
-chmod 2775 /home/scan
-useradd -M -s /usr/sbin/nologin -u 1100 scan
-usermod -aG smbshare scan
-cat >> /etc/samba/smb.conf <<SAMBA
-
-[scan]
-   path = /home/scan
-   writable = yes
-   guest ok = yes
-   force create mode = 775
-   force directory mode = 775
-SAMBA
-
-echo -e "${yellow}Scan user passwd...${white}"
-sudo smbpasswd -a scan
-sudo smbpasswd -e scan
-
 echo -e "${yellow}root passwd...${white}"
-echo "root:admin" | chpasswd
+passwd
+
+#echo -e "${yellow}LIVE user sync...${white}"
+#rsync -avz --delete /etc/skel/ /home/live/
+#chown -R live:live /home/live/
+
+rm /etc/debian_chroot
 

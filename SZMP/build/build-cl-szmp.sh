@@ -28,7 +28,7 @@ lb config noauto \
   --iso-publisher "Sleepy.hu" \
   --iso-volume "$ISO_NAME" \
   --memtest none \
-  --interactive shell
+  --interactive shell 
 
 mkdir -p config/package-lists
 
@@ -77,7 +77,6 @@ eog
 imagemagick
 zstd
 
-menulibre
 mugshot
 keepassxc
 geany
@@ -111,6 +110,7 @@ libpam-google-authenticator
 
 gnome-system-tools
 gnome-online-accounts
+gnome-calendar
 
 kleopatra
 geogebra
@@ -123,18 +123,17 @@ accountsservice
 xfce4-session
 
 htop
+
 onionshare
 fastfetch
 git
-
 deluge
 syncthing
 qrencode
 qreator
 ecryptfs-utils
-
 ffmpeg
-
+bleachbit
 
 greybird-gtk-theme
 elementary-xfce-icon-theme
@@ -227,6 +226,13 @@ chmod 440 /etc/sudoers.d/veracrypt
 rm -rf veracrypt-*
 
 # # #
+# Live user
+#id -u live >/dev/null 2>&1 || useradd -m -s /bin/bash -G audio,cdrom,dip,floppy,video,plugdev,netdev,sudo live
+#echo "live:live" | chpasswd
+#chmod 700 /home/live
+#chown -R live:live /home/live
+
+# # #
 echo "== FULL BUILD DONE =="
 EOF
 chmod +x config/hooks/normal/999-full.hook.chroot
@@ -242,8 +248,8 @@ echo
 lb build
 
 echo
+DATUM=`date +%Y.%m.%d`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-$DATUM-amd64.iso; md5sum CiszterciLinux-$DATUM-amd64.iso > CiszterciLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
 echo "ISO kész:"
-DATUM=`date +%Y.%m.%d`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-SZMP-$DATUM-amd64.iso; md5sum CiszterciLinux-SZMP-$DATUM-amd64.iso > CiszterciLinux-SZMP-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
 ls -lh *.iso
 
 ### javítás: ###
