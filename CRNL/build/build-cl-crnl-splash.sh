@@ -184,6 +184,13 @@ sprite.SetY(0);
 sprite.SetZ(-100);
 EOF
 
+# GRUB háttérkép config
+mkdir -p config/includes.chroot/etc/default/grub.d
+cat > config/includes.chroot/etc/default/grub.d/99-ciszterci.cfg <<EOF
+GRUB_BACKGROUND="/boot/grub/ciszterci-grub.png"
+GRUB_TIMEOUT=5
+EOF
+
 # CHROOT HOOK
 mkdir -p config/hooks/normal
 
@@ -258,15 +265,20 @@ chmod 440 /etc/sudoers.d/veracrypt
 rm -rf veracrypt-*
 
 # # #
-# Plymouth téma aktiválása
+# Plymouth téma aktiválása + GRUB háttérkép
 # A képet az interaktív shellben kell elhelyezni:
-# /usr/share/plymouth/themes/ciszterci/desktop-grub.png
-# (forrás: /usr/share/images/desktop-base/desktop-grub.png)
+#   /usr/share/plymouth/themes/ciszterci/desktop-grub.png  (Plymouth)
+#   /boot/grub/ciszterci-grub.png                          (GRUB)
+# Forrás: /usr/share/images/desktop-base/desktop-grub.png
 if [ -f /usr/share/images/desktop-base/desktop-grub.png ]; then
   cp /usr/share/images/desktop-base/desktop-grub.png \
      /usr/share/plymouth/themes/ciszterci/desktop-grub.png
+  mkdir -p /boot/grub
+  cp /usr/share/images/desktop-base/desktop-grub.png \
+     /boot/grub/ciszterci-grub.png
 fi
 plymouth-set-default-theme ciszterci
+update-grub
 update-initramfs -u
 
 # # #
@@ -278,10 +290,12 @@ echo
 echo "================================================="
 echo "INTERAKTÍV SHELL fog indulni."
 echo "Szerkeszd az /etc/skel mappát."
-echo "A splash képet másold be:"
+echo "A splash/grub képet másold be:"
 echo "  cp /usr/share/images/desktop-base/desktop-grub.png \\"
 echo "     /usr/share/plymouth/themes/ciszterci/desktop-grub.png"
-echo "Ha saját képet akarsz: tedd a fentire felül."
+echo "  cp /usr/share/images/desktop-base/desktop-grub.png \\"
+echo "     /boot/grub/ciszterci-grub.png"
+echo "Ha saját képet akarsz: tedd a fentiekre felül."
 echo "Kilépés: exit"
 echo "================================================="
 echo

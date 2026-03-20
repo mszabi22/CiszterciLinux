@@ -53,6 +53,7 @@ Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
 
 cp /usr/share/images/desktop-base/desktop-grub.png /usr/share/plymouth/themes/ciszterci/desktop-grub.png
+cp /usr/share/images/desktop-base/desktop-grub.png /boot/grub/ciszterci-grub.png
 rm /etc/debian_chroot
 rm /root/add-programs.sh
 history -c
