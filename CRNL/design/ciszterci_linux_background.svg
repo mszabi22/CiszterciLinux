@@ -5,7 +5,7 @@
    height="1080"
    viewBox="0 0 1920 1080"
    id="svg47"
-   sodipodi:docname="cisztercilinux-background-1920x1080.svg"
+   sodipodi:docname="ciszterci_linux_background.svg"
    inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -21,7 +21,7 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="0.75"
-     inkscape:cx="960.66667"
+     inkscape:cx="962"
      inkscape:cy="540"
      inkscape:window-width="1920"
      inkscape:window-height="1013"
@@ -503,25 +503,6 @@
      stroke-width="1.5"
      opacity="0.6"
      id="line42" />
-  <circle
-     cx="540"
-     cy="744"
-     r="5"
-     fill="#2e5220"
-     opacity="0.6"
-     id="circle42" />
-  <circle
-     cx="1380"
-     cy="744"
-     r="5"
-     fill="#2e5220"
-     opacity="0.6"
-     id="circle43" />
-  <path
-     d="M952 741 L960 732 L968 741 L960 750Z"
-     fill="#2e5220"
-     opacity="0.7"
-     id="path43" />
   <text
      x="962"
      y="902"
