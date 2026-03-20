@@ -84,10 +84,11 @@ editor_filesize_threshold=64M
 editor_stop_format_chars=-+*\\,.;:&>
 mcview_eof=
 skin=default
+shell_directory_timeout=900
 
 [Layout]
 output_lines=0
-left_panel_size=95
+left_panel_size=63
 top_panel_size=0
 message_visible=true
 keybar_visible=true
@@ -138,7 +139,7 @@ quick_search_mode=2
 select_flags=6
 
 [Panelize]
-"patch" parancs utáni másolatfájlok (*.orig) keresése=find . -name \\*.orig -print
-"patch" parancs utáni problémajegyzékek (*.rej) keresése=find . -name \\*.rej -print
 Módosított git fájlok=git ls-files --modified
 SUID és SGID programok keresése=find . \\( \\( -perm -04000 -a -perm /011 \\) -o \\( -perm -02000 -a -perm /01 \\) \\) -print
+"patch" parancs utáni problémajegyzékek (*.rej) keresése=find . -name \\*.rej -print
+"patch" parancs utáni másolatfájlok (*.orig) keresése=find . -name \\*.orig -print

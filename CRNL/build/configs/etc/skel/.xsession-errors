@@ -1,728 +1,128 @@
-Xsession: X session started for mszabi at 2025. febr. 3., hétfő, 13:52:00 CET
+Xsession: X session started for dolgozat at 2026. márc. 20., péntek, 07:36:04 CET
 dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 dbus-update-activation-environment: setting DISPLAY=:0
-dbus-update-activation-environment: setting XAUTHORITY=/home/mszabi/.Xauthority
+dbus-update-activation-environment: setting XAUTHORITY=/home/dolgozat/.Xauthority
 dbus-update-activation-environment: setting XDG_CURRENT_DESKTOP=XFCE
-localuser:mszabi being added to access control list
+localuser:dolgozat being added to access control list
 dbus-update-activation-environment: setting XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share/:/usr/share/
-dbus-update-activation-environment: setting GTK_MODULES=gail:atk-bridge
 dbus-update-activation-environment: setting QT_ACCESSIBILITY=1
 /usr/bin/startxfce4: X server already running on display :0
-xfce4-session-Message: 13:52:00.790: SSH authentication agent is already running
+** Message: 07:36:04.872: Failed to fetch _NET_NUMBER_OF_DESKTOPS; assuming 1
+** Message: 07:36:04.872: Failed to get _NET_WORKAREA; using full screen dimensions
+** Message: 07:36:04.872: Failed to fetch _NET_CURRENT_DESKTOP; assuming 0
+** Message: 07:36:04.872: Failed to fetch _NET_CURRENT_DESKTOP; assuming 0
+/usr/bin/iceauth:  creating new authority file /run/user/1000/ICEauthority
+xfce4-session-Message: 07:36:04.878: SSH authentication agent is already running
+gpg-agent: a gpg-agent is already running - not starting a new one
 
-(xfwm4:2205): xfwm4-WARNING **: 13:52:01.040: Unsupported GL renderer (llvmpipe (LLVM 15.0.6, 256 bits)).
+(xfwm4:1303): Gtk-WARNING **: 07:36:05.099: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-** (wrapper-2.0:2233): WARNING **: 13:52:02.825: No outputs have backlight property
-Xfce power manager is not running
+(xfwm4:1303): Gtk-WARNING **: 07:36:05.099: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
+** Message: 07:36:05.231: Failed to fetch _NET_CURRENT_DESKTOP; assuming 0
 
-(xfce4-session:2140): xfce4-session-WARNING **: 13:52:03.527: Unable to launch "start-pulseaudio-x11" (specified by autostart/pulseaudio.desktop): Nem sikerült a gyermekfolyamat („start-pulseaudio-x11”) végrehajtása (Nincs ilyen fájl vagy könyvtár)
+(xfwm4:1303): xfwm4-WARNING **: 07:36:05.292: Unsupported GL renderer (llvmpipe (LLVM 19.1.7, 256 bits)).
 
-** (xiccd:2293): WARNING **: 13:52:03.802: EDID is empty
+(xfce4-session:1212): Gtk-WARNING **: 07:36:05.362: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(xfce4-power-manager:2278): xfce4-power-manager-WARNING **: 13:52:04.044: could not map keysym 1008ffa8 to keycode
+(xfce4-session:1212): Gtk-WARNING **: 07:36:05.363: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
+(xfsettingsd:1329): Gtk-WARNING **: 07:36:05.408: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-** (xfce4-power-manager:2278): WARNING **: 13:52:04.195: No outputs have backlight property
+(xfsettingsd:1329): Gtk-WARNING **: 07:36:05.408: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(xfce4-power-manager:2278): xfce4-power-manager-WARNING **: 13:52:04.247: Failed to get keyboard max brightness level : GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: Az objektum nem létezik a(z) „/org/freedesktop/UPower/KbdBacklight” útvonalon
-Xfce energiakezelő: Már fut egy másik energiakezelő
+(Thunar:1343): Gtk-WARNING **: 07:36:05.546: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:2230): Gtk-WARNING **: 13:52:04.436: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-Már fut egy értesítési démon, kilépés
-Process already running (98:A cím már használatban van). Exiting.
-blueman-applet 13.52.06 WARNING  PluginManager:151 __load_plugin: Not loading PPPSupport because its conflict has higher priority
-blueman-applet 13.52.06 WARNING  PluginManager:151 __load_plugin: Not loading DhcpClient because its conflict has higher priority
-blueman-applet 13.52.31 WARNING  DiscvManager:119 update_menuitems: warning: Adapter is None
-[GFX1-]: RenderCompositorSWGL failed mapping default framebuffer, no dt
-QString::arg: 1 argument(s) missing in A böngészőintegráció működéséhez a KeePassXC-böngészőre van szükség. <br />Letölthető ezen böngészőkre: %1, %2, %3, 4%
-[GFX1-]: RenderCompositorSWGL failed mapping default framebuffer, no dt
-[3440:3440:0203/135954.060556:ERROR:secret_portal_key_provider.cc(200)] Keyring unlock cancelled: 2
-[3440:3440:0203/135956.358970:ERROR:atom_cache.cc(229)] Add WM_CHANGE_STATE to kAtomsToCache
-[GFX1-]: RenderCompositorSWGL failed mapping default framebuffer, no dt
-[91m[CRITICAL 13:56:24.737662][0m [Wnck] wnck_set_client_type: changing the client type is not supported.
-[93m[WARN 13:56:24.878225][0m [Preferences:192] '/usr/share/plank/themes/Default/dock.theme' is read-only!
-[93m[WARN 13:56:25.032307][0m Creating surface took WAY TOO LONG (95ms), enabled downscaling for this cache!
-[93m[WARN 13:57:12.260648][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Firefox ESR'
-[93m[WARN 13:57:12.261161][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Firefox ESR'
-[93m[WARN 13:57:28.337265][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'KeePassXC'
-[93m[WARN 13:57:28.342341][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'KeePassXC'
-[93m[WARN 13:58:08.464441][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Firefox ESR'
-[93m[WARN 13:58:08.464960][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Firefox ESR'
-[93m[WARN 13:58:33.885898][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Thunar fájlkezelő'
-[93m[WARN 13:58:33.887752][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Thunar fájlkezelő'
-[93m[WARN 13:59:52.040237][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Hozzáféréskérés'
-[93m[WARN 13:59:52.040633][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Hozzáféréskérés'
-[93m[WARN 13:59:58.552878][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Brave Webböngésző'
-[93m[WARN 13:59:58.554000][0m [PositionManager:681] Without a draw_value there is trouble ahead for 'Brave Webböngésző'
-[93m[WARN 14:00:45.197667][0m [AbstractMain:42] Caught signal (15), exiting
+(Thunar:1343): Gtk-WARNING **: 07:36:05.546: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:2234): GLib-GObject-CRITICAL **: 14:04:42.457: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
+(xfce4-panel:1338): Gtk-WARNING **: 07:36:05.575: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
+(xfce4-panel:1338): Gtk-WARNING **: 07:36:05.575: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-** (wrapper-2.0:3877): WARNING **: 14:04:43.591: No outputs have backlight property
+(xfdesktop:1349): Gtk-WARNING **: 07:36:05.612: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:3874): Gtk-WARNING **: 14:04:44.239: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
+(xfdesktop:1349): Gtk-WARNING **: 07:36:05.613: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:3878): GLib-GObject-CRITICAL **: 14:05:41.732: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
+(wrapper-2.0:1353): Gtk-WARNING **: 07:36:05.840: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
+(wrapper-2.0:1353): Gtk-WARNING **: 07:36:05.840: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-** (wrapper-2.0:3969): WARNING **: 14:05:42.868: No outputs have backlight property
+(wrapper-2.0:1354): Gtk-WARNING **: 07:36:05.843: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:3966): Gtk-WARNING **: 14:05:43.503: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
+(wrapper-2.0:1354): Gtk-WARNING **: 07:36:05.843: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:3970): GLib-GObject-CRITICAL **: 14:06:07.561: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
+(wrapper-2.0:1358): Gtk-WARNING **: 07:36:05.851: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
+(wrapper-2.0:1358): Gtk-WARNING **: 07:36:05.851: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(xfce4-panel:4048): Gtk-WARNING **: 14:06:07.759: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1359): Gtk-WARNING **: 07:36:05.963: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4053): Gtk-WARNING **: 14:06:08.205: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1359): Gtk-WARNING **: 07:36:05.963: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4052): Gtk-WARNING **: 14:06:08.209: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1361): Gtk-WARNING **: 07:36:05.965: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4054): Gtk-WARNING **: 14:06:08.214: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1361): Gtk-WARNING **: 07:36:05.965: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4056): Gtk-WARNING **: 14:06:08.232: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1360): Gtk-WARNING **: 07:36:05.973: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4057): Gtk-WARNING **: 14:06:08.248: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1360): Gtk-WARNING **: 07:36:05.974: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4055): Gtk-WARNING **: 14:06:08.319: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1369): Gtk-WARNING **: 07:36:05.991: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4058): Gtk-WARNING **: 14:06:08.402: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(wrapper-2.0:1369): Gtk-WARNING **: 07:36:05.991: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-** (wrapper-2.0:4056): WARNING **: 14:06:08.648: No outputs have backlight property
+(nm-applet:1385): Gtk-WARNING **: 07:36:06.381: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4053): Gtk-WARNING **: 14:06:09.349: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
+(nm-applet:1385): Gtk-WARNING **: 07:36:06.381: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4057): GLib-GObject-CRITICAL **: 14:07:04.306: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
+(light-locker:1393): Gtk-WARNING **: 07:36:06.600: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
+(light-locker:1393): Gtk-WARNING **: 07:36:06.600: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(xfce4-panel:4136): Gtk-WARNING **: 14:07:04.495: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(polkit-mate-authentication-agent-1:1415): GLib-CRITICAL **: 07:36:06.830: g_variant_new_string: assertion 'string != NULL' failed
 
-(xfce4-panel:4136): Gtk-WARNING **: 14:07:04.495: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(polkit-mate-authentication-agent-1:1415): polkit-mate-1-WARNING **: 07:36:06.835: Failed to register client: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.SessionManager was not provided by any .service files
 
-(wrapper-2.0:4140): Gtk-WARNING **: 14:07:04.933: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(evolution-alarm-notify:1390): Gtk-WARNING **: 07:36:07.543: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4140): Gtk-WARNING **: 14:07:04.957: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(evolution-alarm-notify:1390): Gtk-WARNING **: 07:36:07.543: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4141): Gtk-WARNING **: 14:07:04.938: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(blueman-applet:1398): Gtk-WARNING **: 07:36:07.602: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4141): Gtk-WARNING **: 14:07:04.958: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(blueman-applet:1398): Gtk-WARNING **: 07:36:07.602: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
+blueman-applet 07.36.07 WARNING  PluginManager:153 __load_plugin: Not loading PPPSupport because its conflict has higher priority
+blueman-applet 07.36.07 WARNING  PluginManager:153 __load_plugin: Not loading DhcpClient because its conflict has higher priority
 
-(wrapper-2.0:4142): Gtk-WARNING **: 14:07:04.944: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(xfdesktop-settings:1632): Gtk-WARNING **: 07:36:11.054: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4142): Gtk-WARNING **: 14:07:04.966: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(xfdesktop-settings:1632): Gtk-WARNING **: 07:36:11.055: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
+/usr/share/system-config-printer/applet.py:366: Warning: Source ID 15 was not found when attempting to remove it
+  GLib.source_remove (self.timer)
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/blueman/plugins/applet/TransferService.py", line 235, in _on_dbus_name_appeared
+    self._manager = Manager()
+                    ~~~~~~~^^
+  File "/usr/lib/python3/dist-packages/blueman/gobject.py", line 11, in __call__
+    cls._instance = super().__call__(*args, **kwargs)
+                    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/blueman/bluez/obex/Manager.py", line 29, in __init__
+    self._object_manager = Gio.DBusObjectManagerClient.new_for_bus_sync(
+                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        Gio.BusType.SESSION, Gio.DBusObjectManagerClientFlags.NONE,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.__bus_name, '/', None, None, None)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+gi.repository.GLib.GError: g-io-error-quark: Az időkorlát elérve (24)
+blueman-applet 07.36.33 WARNING  DiscvManager:122 update_menuitems: warning: Adapter is None
 
-(wrapper-2.0:4144): Gtk-WARNING **: 14:07:04.977: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(xfce4-terminal:1909): Gtk-WARNING **: 07:45:21.320: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4144): Gtk-WARNING **: 14:07:04.977: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(xfce4-terminal:1909): Gtk-WARNING **: 07:45:21.320: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4145): Gtk-WARNING **: 14:07:04.988: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(xfdesktop-settings:2071): Gtk-WARNING **: 07:48:43.247: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4145): Gtk-WARNING **: 14:07:04.988: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
+(xfdesktop-settings:2071): Gtk-WARNING **: 07:48:43.247: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4143): Gtk-WARNING **: 14:07:05.041: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
+(polkit-mate-authentication-agent-1:1415): Gtk-WARNING **: 07:49:45.959: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
 
-(wrapper-2.0:4143): Gtk-WARNING **: 14:07:05.041: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4146): Gtk-WARNING **: 14:07:05.112: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4146): Gtk-WARNING **: 14:07:05.124: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-** (wrapper-2.0:4144): WARNING **: 14:07:05.386: No outputs have backlight property
-
-(wrapper-2.0:4141): Gtk-WARNING **: 14:07:06.149: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4145): GLib-GObject-CRITICAL **: 14:07:41.353: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4225): Gtk-WARNING **: 14:07:41.553: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4225): Gtk-WARNING **: 14:07:41.553: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4229): Gtk-WARNING **: 14:07:41.996: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4229): Gtk-WARNING **: 14:07:42.010: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4230): Gtk-WARNING **: 14:07:42.002: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4230): Gtk-WARNING **: 14:07:42.013: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4231): Gtk-WARNING **: 14:07:42.022: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4231): Gtk-WARNING **: 14:07:42.022: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4233): Gtk-WARNING **: 14:07:42.105: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4233): Gtk-WARNING **: 14:07:42.116: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4234): Gtk-WARNING **: 14:07:42.110: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4234): Gtk-WARNING **: 14:07:42.133: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4232): Gtk-WARNING **: 14:07:42.114: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4232): Gtk-WARNING **: 14:07:42.137: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4235): Gtk-WARNING **: 14:07:42.190: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4235): Gtk-WARNING **: 14:07:42.190: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-** (wrapper-2.0:4233): WARNING **: 14:07:42.495: No outputs have backlight property
-
-(wrapper-2.0:4230): Gtk-WARNING **: 14:07:43.171: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4234): GLib-GObject-CRITICAL **: 14:08:14.366: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4312): Gtk-WARNING **: 14:08:14.559: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4312): Gtk-WARNING **: 14:08:14.559: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(xfce4-panel:4312): Gtk-WARNING **: 14:08:14.559: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4317): Gtk-WARNING **: 14:08:14.997: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4317): Gtk-WARNING **: 14:08:15.013: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4316): Gtk-WARNING **: 14:08:15.003: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4316): Gtk-WARNING **: 14:08:15.014: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4316): Gtk-WARNING **: 14:08:15.014: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4318): Gtk-WARNING **: 14:08:15.008: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4318): Gtk-WARNING **: 14:08:15.021: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4318): Gtk-WARNING **: 14:08:15.021: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4317): Gtk-WARNING **: 14:08:15.014: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4320): Gtk-WARNING **: 14:08:15.075: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4320): Gtk-WARNING **: 14:08:15.075: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4320): Gtk-WARNING **: 14:08:15.075: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4319): Gtk-WARNING **: 14:08:15.087: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4319): Gtk-WARNING **: 14:08:15.087: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4319): Gtk-WARNING **: 14:08:15.087: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4321): Gtk-WARNING **: 14:08:15.096: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4321): Gtk-WARNING **: 14:08:15.096: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4321): Gtk-WARNING **: 14:08:15.096: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-(wrapper-2.0:4322): Gtk-WARNING **: 14:08:15.195: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4322): Gtk-WARNING **: 14:08:15.197: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4322): Gtk-WARNING **: 14:08:15.197: Theme parsing error: gtk.css:2:79: 'font-color' is not a valid property name
-
-** (wrapper-2.0:4320): WARNING **: 14:08:15.485: No outputs have backlight property
-
-(wrapper-2.0:4317): Gtk-WARNING **: 14:08:16.226: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4321): GLib-GObject-CRITICAL **: 14:08:42.788: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4400): Gtk-WARNING **: 14:08:42.980: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4400): Gtk-WARNING **: 14:08:42.980: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(xfce4-panel:4400): Gtk-WARNING **: 14:08:42.980: Theme parsing error: gtk.css:2:75: not a number
-
-(xfce4-panel:4400): Gtk-WARNING **: 14:08:42.980: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4404): Gtk-WARNING **: 14:08:43.406: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4404): Gtk-WARNING **: 14:08:43.418: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4405): Gtk-WARNING **: 14:08:43.411: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4405): Gtk-WARNING **: 14:08:43.420: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4405): Gtk-WARNING **: 14:08:43.420: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4405): Gtk-WARNING **: 14:08:43.420: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4404): Gtk-WARNING **: 14:08:43.420: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4404): Gtk-WARNING **: 14:08:43.427: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4406): Gtk-WARNING **: 14:08:43.433: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4406): Gtk-WARNING **: 14:08:43.433: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4406): Gtk-WARNING **: 14:08:43.433: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4406): Gtk-WARNING **: 14:08:43.433: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4408): Gtk-WARNING **: 14:08:43.506: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4408): Gtk-WARNING **: 14:08:43.506: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4408): Gtk-WARNING **: 14:08:43.506: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4408): Gtk-WARNING **: 14:08:43.507: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4409): Gtk-WARNING **: 14:08:43.516: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4409): Gtk-WARNING **: 14:08:43.522: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4409): Gtk-WARNING **: 14:08:43.522: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4409): Gtk-WARNING **: 14:08:43.522: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4407): Gtk-WARNING **: 14:08:43.520: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4407): Gtk-WARNING **: 14:08:43.535: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4407): Gtk-WARNING **: 14:08:43.535: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4407): Gtk-WARNING **: 14:08:43.535: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4410): Gtk-WARNING **: 14:08:43.602: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4410): Gtk-WARNING **: 14:08:43.602: Theme parsing error: gtk.css:2:67: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4410): Gtk-WARNING **: 14:08:43.602: Theme parsing error: gtk.css:2:75: not a number
-
-(wrapper-2.0:4410): Gtk-WARNING **: 14:08:43.602: Theme parsing error: gtk.css:2:80: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-** (wrapper-2.0:4408): WARNING **: 14:08:43.909: No outputs have backlight property
-
-(wrapper-2.0:4405): Gtk-WARNING **: 14:08:44.626: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4409): GLib-GObject-CRITICAL **: 14:09:38.303: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4506): Gtk-WARNING **: 14:09:38.505: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4506): Gtk-WARNING **: 14:09:38.505: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4510): Gtk-WARNING **: 14:09:38.946: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4510): Gtk-WARNING **: 14:09:38.957: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4511): Gtk-WARNING **: 14:09:38.951: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4511): Gtk-WARNING **: 14:09:38.962: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4512): Gtk-WARNING **: 14:09:38.957: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4512): Gtk-WARNING **: 14:09:38.966: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4514): Gtk-WARNING **: 14:09:39.058: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4514): Gtk-WARNING **: 14:09:39.058: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4515): Gtk-WARNING **: 14:09:39.069: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4515): Gtk-WARNING **: 14:09:39.069: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4513): Gtk-WARNING **: 14:09:39.086: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4513): Gtk-WARNING **: 14:09:39.086: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4516): Gtk-WARNING **: 14:09:39.124: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4516): Gtk-WARNING **: 14:09:39.124: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-** (wrapper-2.0:4514): WARNING **: 14:09:39.455: No outputs have backlight property
-
-(wrapper-2.0:4511): Gtk-WARNING **: 14:09:40.093: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4515): GLib-GObject-CRITICAL **: 14:10:14.854: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4588): Gtk-WARNING **: 14:10:15.052: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4588): Gtk-WARNING **: 14:10:15.052: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(xfce4-panel:4588): Gtk-WARNING **: 14:10:15.052: Theme parsing error: gtk.css:2:97: not a number
-
-(xfce4-panel:4588): Gtk-WARNING **: 14:10:15.053: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4593): Gtk-WARNING **: 14:10:15.490: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4593): Gtk-WARNING **: 14:10:15.510: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4594): Gtk-WARNING **: 14:10:15.498: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4594): Gtk-WARNING **: 14:10:15.511: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4594): Gtk-WARNING **: 14:10:15.511: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4594): Gtk-WARNING **: 14:10:15.511: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4592): Gtk-WARNING **: 14:10:15.500: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4592): Gtk-WARNING **: 14:10:15.513: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4592): Gtk-WARNING **: 14:10:15.513: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4592): Gtk-WARNING **: 14:10:15.513: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4596): Gtk-WARNING **: 14:10:15.510: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4596): Gtk-WARNING **: 14:10:15.534: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4596): Gtk-WARNING **: 14:10:15.534: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4596): Gtk-WARNING **: 14:10:15.534: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4593): Gtk-WARNING **: 14:10:15.511: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4593): Gtk-WARNING **: 14:10:15.545: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4597): Gtk-WARNING **: 14:10:15.613: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4597): Gtk-WARNING **: 14:10:15.618: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4597): Gtk-WARNING **: 14:10:15.618: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4597): Gtk-WARNING **: 14:10:15.618: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4595): Gtk-WARNING **: 14:10:15.618: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4595): Gtk-WARNING **: 14:10:15.625: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4595): Gtk-WARNING **: 14:10:15.625: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4595): Gtk-WARNING **: 14:10:15.625: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-(wrapper-2.0:4598): Gtk-WARNING **: 14:10:15.634: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4598): Gtk-WARNING **: 14:10:15.634: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4598): Gtk-WARNING **: 14:10:15.634: Theme parsing error: gtk.css:2:97: not a number
-
-(wrapper-2.0:4598): Gtk-WARNING **: 14:10:15.634: Theme parsing error: gtk.css:2:102: Using Pango syntax for the font: style property is deprecated; please use CSS syntax
-
-** (wrapper-2.0:4596): WARNING **: 14:10:15.890: No outputs have backlight property
-
-(wrapper-2.0:4593): Gtk-WARNING **: 14:10:16.625: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4597): GLib-GObject-CRITICAL **: 14:10:34.498: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4672): Gtk-WARNING **: 14:10:34.691: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4672): Gtk-WARNING **: 14:10:34.691: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(xfce4-panel:4672): Gtk-WARNING **: 14:10:34.691: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4676): Gtk-WARNING **: 14:10:35.153: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4676): Gtk-WARNING **: 14:10:35.175: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4677): Gtk-WARNING **: 14:10:35.158: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4677): Gtk-WARNING **: 14:10:35.176: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4677): Gtk-WARNING **: 14:10:35.176: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4678): Gtk-WARNING **: 14:10:35.166: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4678): Gtk-WARNING **: 14:10:35.183: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4678): Gtk-WARNING **: 14:10:35.183: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4680): Gtk-WARNING **: 14:10:35.185: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4680): Gtk-WARNING **: 14:10:35.185: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4680): Gtk-WARNING **: 14:10:35.185: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4676): Gtk-WARNING **: 14:10:35.176: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4681): Gtk-WARNING **: 14:10:35.195: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4681): Gtk-WARNING **: 14:10:35.196: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4681): Gtk-WARNING **: 14:10:35.196: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4679): Gtk-WARNING **: 14:10:35.302: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4679): Gtk-WARNING **: 14:10:35.312: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4679): Gtk-WARNING **: 14:10:35.312: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-(wrapper-2.0:4682): Gtk-WARNING **: 14:10:35.319: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4682): Gtk-WARNING **: 14:10:35.319: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4682): Gtk-WARNING **: 14:10:35.319: Theme parsing error: gtk.css:2:101: 'text-color' is not a valid property name
-
-** (wrapper-2.0:4680): WARNING **: 14:10:35.584: No outputs have backlight property
-
-(wrapper-2.0:4677): Gtk-WARNING **: 14:10:36.369: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4681): GLib-GObject-CRITICAL **: 14:10:55.775: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4754): Gtk-WARNING **: 14:10:56.001: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4754): Gtk-WARNING **: 14:10:56.001: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4759): Gtk-WARNING **: 14:10:56.461: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4759): Gtk-WARNING **: 14:10:56.475: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4758): Gtk-WARNING **: 14:10:56.466: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4758): Gtk-WARNING **: 14:10:56.494: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4760): Gtk-WARNING **: 14:10:56.471: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4760): Gtk-WARNING **: 14:10:56.505: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4762): Gtk-WARNING **: 14:10:56.529: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4762): Gtk-WARNING **: 14:10:56.529: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4763): Gtk-WARNING **: 14:10:56.540: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4763): Gtk-WARNING **: 14:10:56.540: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4761): Gtk-WARNING **: 14:10:56.603: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4761): Gtk-WARNING **: 14:10:56.606: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4764): Gtk-WARNING **: 14:10:56.619: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4764): Gtk-WARNING **: 14:10:56.620: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-** (wrapper-2.0:4762): WARNING **: 14:10:56.900: No outputs have backlight property
-
-(wrapper-2.0:4759): Gtk-WARNING **: 14:10:57.611: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4763): GLib-GObject-CRITICAL **: 14:11:39.606: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4836): Gtk-WARNING **: 14:11:39.821: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4836): Gtk-WARNING **: 14:11:39.821: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4841): Gtk-WARNING **: 14:11:40.275: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4841): Gtk-WARNING **: 14:11:40.287: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4840): Gtk-WARNING **: 14:11:40.281: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4840): Gtk-WARNING **: 14:11:40.305: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4842): Gtk-WARNING **: 14:11:40.287: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4842): Gtk-WARNING **: 14:11:40.314: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4844): Gtk-WARNING **: 14:11:40.390: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4844): Gtk-WARNING **: 14:11:40.405: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4845): Gtk-WARNING **: 14:11:40.395: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4845): Gtk-WARNING **: 14:11:40.415: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4843): Gtk-WARNING **: 14:11:40.403: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4843): Gtk-WARNING **: 14:11:40.433: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4846): Gtk-WARNING **: 14:11:40.477: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4846): Gtk-WARNING **: 14:11:40.477: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-** (wrapper-2.0:4844): WARNING **: 14:11:40.815: No outputs have backlight property
-
-(wrapper-2.0:4841): Gtk-WARNING **: 14:11:41.472: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:4845): GLib-GObject-CRITICAL **: 14:11:51.542: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:4914): Gtk-WARNING **: 14:11:51.751: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:4914): Gtk-WARNING **: 14:11:51.751: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4919): Gtk-WARNING **: 14:11:52.207: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4919): Gtk-WARNING **: 14:11:52.219: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4918): Gtk-WARNING **: 14:11:52.213: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4918): Gtk-WARNING **: 14:11:52.226: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4920): Gtk-WARNING **: 14:11:52.219: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4920): Gtk-WARNING **: 14:11:52.229: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4923): Gtk-WARNING **: 14:11:52.308: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4923): Gtk-WARNING **: 14:11:52.308: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4921): Gtk-WARNING **: 14:11:52.318: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4921): Gtk-WARNING **: 14:11:52.321: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4922): Gtk-WARNING **: 14:11:52.320: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4922): Gtk-WARNING **: 14:11:52.324: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4924): Gtk-WARNING **: 14:11:52.417: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:4924): Gtk-WARNING **: 14:11:52.430: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-** (wrapper-2.0:4922): WARNING **: 14:11:52.729: No outputs have backlight property
-
-(wrapper-2.0:4919): Gtk-WARNING **: 14:11:53.412: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(xfce4-appearance-settings:5005): Gtk-WARNING **: 14:13:38.227: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-appearance-settings:5005): Gtk-WARNING **: 14:13:38.227: Theme parsing error: gtk.css:2:68: 'd4af34' is not a valid color name
-
-(xfce4-terminal:5030): Gtk-WARNING **: 14:14:12.023: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-terminal:5030): Gtk-WARNING **: 14:14:12.024: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:4923): GLib-GObject-CRITICAL **: 14:14:13.049: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:5066): Gtk-WARNING **: 14:14:13.256: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:5066): Gtk-WARNING **: 14:14:13.256: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5071): Gtk-WARNING **: 14:14:13.721: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5071): Gtk-WARNING **: 14:14:13.736: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5070): Gtk-WARNING **: 14:14:13.727: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5070): Gtk-WARNING **: 14:14:13.737: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5072): Gtk-WARNING **: 14:14:13.732: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5072): Gtk-WARNING **: 14:14:13.745: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5075): Gtk-WARNING **: 14:14:13.820: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5075): Gtk-WARNING **: 14:14:13.820: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5074): Gtk-WARNING **: 14:14:13.830: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5074): Gtk-WARNING **: 14:14:13.830: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5073): Gtk-WARNING **: 14:14:13.848: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5073): Gtk-WARNING **: 14:14:13.863: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-(wrapper-2.0:5076): Gtk-WARNING **: 14:14:13.917: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5076): Gtk-WARNING **: 14:14:13.917: Theme parsing error: gtk.css:2:17: Invalid name of pseudo-class
-
-** (wrapper-2.0:5074): WARNING **: 14:14:14.238: No outputs have backlight property
-
-(wrapper-2.0:5071): Gtk-WARNING **: 14:14:14.969: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:5075): GLib-GObject-CRITICAL **: 14:16:18.137: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:5149): Gtk-WARNING **: 14:16:18.343: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(xfce4-panel:5149): Gtk-WARNING **: 14:16:18.343: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5153): Gtk-WARNING **: 14:16:18.808: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5153): Gtk-WARNING **: 14:16:18.822: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5154): Gtk-WARNING **: 14:16:18.815: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5154): Gtk-WARNING **: 14:16:18.829: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5155): Gtk-WARNING **: 14:16:18.821: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5155): Gtk-WARNING **: 14:16:18.830: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5158): Gtk-WARNING **: 14:16:18.926: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5158): Gtk-WARNING **: 14:16:18.938: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5157): Gtk-WARNING **: 14:16:18.954: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5157): Gtk-WARNING **: 14:16:18.954: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5156): Gtk-WARNING **: 14:16:18.931: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5156): Gtk-WARNING **: 14:16:18.957: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5159): Gtk-WARNING **: 14:16:18.990: Theme parsing error: gtk.css:1:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5159): Gtk-WARNING **: 14:16:18.990: Theme parsing error: gtk.css:2:75: 'd4af34' is not a valid color name
-
-** (wrapper-2.0:5157): WARNING **: 14:16:19.326: No outputs have backlight property
-
-(wrapper-2.0:5154): Gtk-WARNING **: 14:16:20.020: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(wrapper-2.0:5158): GLib-GObject-CRITICAL **: 14:17:21.231: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
-xfce4-panel: Újraindítás…
-
-
-(xfce4-panel:5234): Gtk-WARNING **: 14:17:21.458: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(xfce4-panel:5234): Gtk-WARNING **: 14:17:21.458: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5239): Gtk-WARNING **: 14:17:21.935: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5239): Gtk-WARNING **: 14:17:21.954: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5240): Gtk-WARNING **: 14:17:21.950: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5240): Gtk-WARNING **: 14:17:21.961: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5238): Gtk-WARNING **: 14:17:21.953: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5238): Gtk-WARNING **: 14:17:21.969: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5242): Gtk-WARNING **: 14:17:22.070: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5242): Gtk-WARNING **: 14:17:22.083: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5243): Gtk-WARNING **: 14:17:22.076: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5243): Gtk-WARNING **: 14:17:22.089: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5241): Gtk-WARNING **: 14:17:22.081: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5241): Gtk-WARNING **: 14:17:22.105: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5244): Gtk-WARNING **: 14:17:22.134: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5244): Gtk-WARNING **: 14:17:22.134: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-** (wrapper-2.0:5242): WARNING **: 14:17:22.499: No outputs have backlight property
-
-(wrapper-2.0:5239): Gtk-WARNING **: 14:17:23.176: Negative content width -4 (allocation 16, extents 10x10) while allocating gadget (node button, owner PlacesButton)
-
-(xfce4-terminal:5332): Gtk-WARNING **: 14:17:49.132: Theme parsing error: gtk.css:1:68: 'd4af34' is not a valid color name
-
-(xfce4-terminal:5332): Gtk-WARNING **: 14:17:49.133: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
-
-(wrapper-2.0:5243): GLib-GObject-CRITICAL **: 14:18:56.988: g_object_unref: assertion 'G_IS_OBJECT (object)' failed
+(polkit-mate-authentication-agent-1:1415): Gtk-WARNING **: 07:49:45.964: Theme parsing error: gtk.css:2:76: 'd4af34' is not a valid color name
 X connection to :0.0 broken (explicit kill or server shutdown).

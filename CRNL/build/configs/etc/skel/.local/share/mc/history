@@ -1,6 +1,3 @@
-[input2]
-0=/home/mszabi/
-
 [input-def]
 0=*
 
@@ -9,10 +6,16 @@
 1=mcedit ~/.config/gtk-3.0/gtk.css
 2=
 
+[input2]
+0=/home/mszabi/
+1=/usr/share/icons
+
 [Dir Hist New Right Panel]
 0=/home/mszabi
+1=/home/dolgozat
 
 [Dir Hist New Left Panel]
 0=/home/mszabi
 1=/home/mszabi/.config
 2=/home/mszabi/.config/gtk-3.0
+3=/usr/share/icons
