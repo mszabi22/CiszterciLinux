@@ -184,12 +184,17 @@ sprite.SetY(0);
 sprite.SetZ(-100);
 EOF
 
-# GRUB háttérkép config
+# GRUB háttérkép config (chroot-beli, telepített rendszerhez)
 mkdir -p config/includes.chroot/etc/default/grub.d
 cat > config/includes.chroot/etc/default/grub.d/99-ciszterci.cfg <<EOF
 GRUB_BACKGROUND="/boot/grub/ciszterci-grub.png"
 GRUB_TIMEOUT=5
 EOF
+
+# GRUB háttérkép a LIVE ISO bootloaderhez
+# Az lb binary a config/bootloaders/grub-pc/splash.png-t automatikusan használja
+mkdir -p config/bootloaders/grub-pc
+# A képet az interaktív shellből másoljuk ide (ld. üzenet lent)
 
 # CHROOT HOOK
 mkdir -p config/hooks/normal
@@ -265,11 +270,7 @@ chmod 440 /etc/sudoers.d/veracrypt
 rm -rf veracrypt-*
 
 # # #
-# Plymouth téma aktiválása + GRUB háttérkép
-# A képet az interaktív shellben kell elhelyezni:
-#   /usr/share/plymouth/themes/ciszterci/desktop-grub.png  (Plymouth)
-#   /boot/grub/ciszterci-grub.png                          (GRUB)
-# Forrás: /usr/share/images/desktop-base/desktop-grub.png
+# Plymouth téma aktiválása + GRUB háttérkép (telepített rendszerhez)
 if [ -f /usr/share/images/desktop-base/desktop-grub.png ]; then
   cp /usr/share/images/desktop-base/desktop-grub.png \
      /usr/share/plymouth/themes/ciszterci/desktop-grub.png
@@ -278,7 +279,6 @@ if [ -f /usr/share/images/desktop-base/desktop-grub.png ]; then
      /boot/grub/ciszterci-grub.png
 fi
 plymouth-set-default-theme ciszterci
-update-grub
 update-initramfs -u
 
 # # #
@@ -290,12 +290,15 @@ echo
 echo "================================================="
 echo "INTERAKTÍV SHELL fog indulni."
 echo "Szerkeszd az /etc/skel mappát."
-echo "A splash/grub képet másold be:"
-echo "  cp /usr/share/images/desktop-base/desktop-grub.png \\"
-echo "     /usr/share/plymouth/themes/ciszterci/desktop-grub.png"
-echo "  cp /usr/share/images/desktop-base/desktop-grub.png \\"
-echo "     /boot/grub/ciszterci-grub.png"
-echo "Ha saját képet akarsz: tedd a fentiekre felül."
+echo "A képet másold be (Plymouth + GRUB live + GRUB telepített):"
+echo "  SRC=/usr/share/images/desktop-base/desktop-grub.png"
+echo "  cp \$SRC /usr/share/plymouth/themes/ciszterci/desktop-grub.png"
+echo "  mkdir -p /boot/grub"
+echo "  cp \$SRC /boot/grub/ciszterci-grub.png"
+echo ""
+echo "  -- és a live ISO GRUB háttérhez (chroot-on KÍVÜL, host-on):"
+echo "  cp <képed>.png /DATA/LIVE/CiszterciLinux/config/bootloaders/grub-pc/splash.png"
+echo ""
 echo "Kilépés: exit"
 echo "================================================="
 echo
