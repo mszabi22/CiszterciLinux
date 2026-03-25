@@ -24,7 +24,7 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="0.75"
-     inkscape:cx="964"
+     inkscape:cx="964.66667"
      inkscape:cy="540"
      inkscape:window-width="1920"
      inkscape:window-height="1013"
@@ -516,32 +516,4 @@
      id="text44"
      style="fill:#5c9548;fill-opacity:1;opacity:1">linux.crnl.hu</text>
   <!-- Corner ornaments -->
-  <path
-     d="M60 40 L60 100 L120 100"
-     stroke="#2e5220"
-     stroke-width="2"
-     fill="none"
-     opacity="0.35"
-     id="path44" />
-  <path
-     d="M1860 40 L1860 100 L1800 100"
-     stroke="#2e5220"
-     stroke-width="2"
-     fill="none"
-     opacity="0.35"
-     id="path45" />
-  <path
-     d="M60 1040 L60 980 L120 980"
-     stroke="#2e5220"
-     stroke-width="2"
-     fill="none"
-     opacity="0.35"
-     id="path46" />
-  <path
-     d="M1860 1040 L1860 980 L1800 980"
-     stroke="#2e5220"
-     stroke-width="2"
-     fill="none"
-     opacity="0.35"
-     id="path47" />
 </svg>
