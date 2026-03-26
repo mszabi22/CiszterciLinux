@@ -203,7 +203,9 @@ cat > config/hooks/normal/999-grub-title.hook.binary <<'EOF'
 #!/bin/bash
 set -e
 # GRUB menüpont átnevezése Debian -> CiszterciLinux
-sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' binary/boot/grub/grub.cfg
+if [ -f /boot/grub/grub.cfg ]; then
+  sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' /boot/grub/grub.cfg
+fi
 EOF
 chmod +x config/hooks/normal/999-grub-title.hook.binary
 
