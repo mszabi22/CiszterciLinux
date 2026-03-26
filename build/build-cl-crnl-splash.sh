@@ -199,16 +199,6 @@ mkdir -p config/bootloaders/grub-pc
 # CHROOT HOOK
 mkdir -p config/hooks/normal
 
-cat > config/hooks/normal/999-grub-title.hook.binary <<'EOF'
-#!/bin/bash
-set -e
-# GRUB menüpont átnevezése Debian -> CiszterciLinux
-if [ -f /boot/grub/grub.cfg ]; then
-  sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' /boot/grub/grub.cfg
-fi
-EOF
-chmod +x config/hooks/normal/999-grub-title.hook.binary
-
 cat > config/hooks/normal/999-full.hook.chroot <<'EOF'
 #!/bin/bash
 set -e
@@ -287,6 +277,10 @@ if [ -f /usr/share/images/desktop-base/desktop-grub.png ]; then
   mkdir -p /boot/grub
   cp /usr/share/images/desktop-base/desktop-grub.png \
      /boot/grub/ciszterci-grub.png
+fi
+# GRUB menüpont átnevezése Debian -> CiszterciLinux
+if [ -f /boot/grub/grub.cfg ]; then
+  sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' /boot/grub/grub.cfg
 fi
 plymouth-set-default-theme ciszterci
 update-initramfs -u
