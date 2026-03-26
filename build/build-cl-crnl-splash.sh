@@ -320,3 +320,6 @@ ls -lh *.iso
 #sudo chroot chroot /bin/bash
 #lb clean --binary
 #lb binary
+# ha csak az ISO-t kell:
+# rm .build/binary_iso
+# lb binary_iso
