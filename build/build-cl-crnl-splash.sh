@@ -189,6 +189,7 @@ mkdir -p config/includes.chroot/etc/default/grub.d
 cat > config/includes.chroot/etc/default/grub.d/99-ciszterci.cfg <<EOF
 GRUB_BACKGROUND="/boot/grub/ciszterci-grub.png"
 GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="CiszterciLinux"
 EOF
 
 # GRUB háttérkép a LIVE ISO bootloaderhez
