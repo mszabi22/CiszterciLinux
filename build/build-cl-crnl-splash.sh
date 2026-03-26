@@ -310,7 +310,7 @@ echo
 lb build
 
 echo
-DATUM=`date +%y.%m`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-v$DATUM-amd64.iso; md5sum CiszterciLinux-v$DATUM-amd64.iso > CiszterciLinux-v$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
+DATUM=`date +%y.%m`; mv CiszterciLinux-amd64.hybrid.iso CiszterciLinux-$DATUM-amd64.iso; md5sum CiszterciLinux-$DATUM-amd64.iso > CiszterciLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza CiszterciLinux-*
 echo "ISO kész:"
 ls -lh *.iso
 
