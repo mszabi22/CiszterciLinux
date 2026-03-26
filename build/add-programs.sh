@@ -51,9 +51,11 @@ Type=Application
 Categories=Office;
 Enabled=true" > /usr/share/applications/standard-notes.desktop
 ########################################################################
+SRC=/usr/share/images/desktop-base/desktop-grub.png
+cp $SRC /usr/share/plymouth/themes/ciszterci/desktop-grub.png
+mkdir -p /boot/grub
+cp $SRC /boot/grub/ciszterci-grub.png
 
-cp /usr/share/images/desktop-base/desktop-grub.png /usr/share/plymouth/themes/ciszterci/desktop-grub.png
-cp /usr/share/images/desktop-base/desktop-grub.png /boot/grub/ciszterci-grub.png
 rm /etc/debian_chroot
 rm /root/add-programs.sh
 history -c
