@@ -282,6 +282,7 @@ fi
 # GRUB menüpont átnevezése Debian -> CiszterciLinux
 if [ -f /boot/grub/grub.cfg ]; then
   sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' /boot/grub/grub.cfg
+  sed -i 's/Live system/CiszterciLinux Live/g' /boot/grub/grub.cfg
 fi
 plymouth-set-default-theme ciszterci
 update-initramfs -u
