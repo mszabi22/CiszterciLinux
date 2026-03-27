@@ -317,10 +317,22 @@ echo "ISO kész:"
 ls -lh *.iso
 
 ### javítás: ###
+#mount -t proc proc chroot/proc
+#mount -t sysfs sysfs chroot/sys
+#mount -o bind /dev chroot/dev
+#mount -o bind /dev/pts chroot/dev/pts
+
 #sudo chroot chroot /bin/bash
+
+#umount chroot/dev/pts
+#umount chroot/dev
+#umount chroot/proc
+#umount chroot/sys
+
 #lb clean --binary
 #rm /DATA/LIVE/CiszterciLinux/chroot/etc/debian_chroot*
 #lb binary
+
 # ha csak az ISO-t kell:
 # rm .build/binary_iso
 # lb binary_iso
