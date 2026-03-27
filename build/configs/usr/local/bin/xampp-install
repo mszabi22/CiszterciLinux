@@ -17,5 +17,5 @@ Icon=/usr/share/icons/xampp-logo.svg
 Encoding=UTF-8
 ExecutionMode=normal
 Type=Application
-Categories=Network;
+Categories=Development;
 Enabled=true" > /usr/share/applications/xampp.desktop
