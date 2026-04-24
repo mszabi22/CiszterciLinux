@@ -11,6 +11,10 @@ rm -rf $WORKDIR
 mkdir $WORKDIR
 cd $WORKDIR
 
+# GRUB splash – helyes, relatív útvonal:
+mkdir -p config/bootloaders/grub-pc
+cp /home/majorsza/forgejo/CiszterciLinux/design/ciszterci_linux_splash.png config/bootloaders/grub-pc/splash.png
+
 lb clean
 
 lb config noauto \
@@ -150,9 +154,6 @@ plymouth
 plymouth-themes
 EOF
 
-mkdir -p /DATA/LIVE/CiszterciLinux/config/bootloaders/grub-pc
-cp /home/majorsza/forgejo/CiszterciLinux/design/ciszterci_linux_splash.png /DATA/LIVE/SleepyLinux/config/bootloaders/grub-pc/splash.png
-
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
 cat > config/includes.chroot/etc/lightdm/lightdm.conf.d/01-autologin.conf <<EOF
@@ -195,10 +196,6 @@ GRUB_TIMEOUT=5
 GRUB_DISTRIBUTOR="CiszterciLinux"
 EOF
 
-# GRUB háttérkép a LIVE ISO bootloaderhez
-# Az lb binary a config/bootloaders/grub-pc/splash.png-t automatikusan használja
-mkdir -p config/bootloaders/grub-pc
-# A képet az interaktív shellből másoljuk ide (ld. üzenet lent)
 
 # CHROOT HOOK
 mkdir -p config/hooks/normal
