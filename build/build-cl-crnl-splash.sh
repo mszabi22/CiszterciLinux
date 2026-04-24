@@ -150,6 +150,9 @@ plymouth
 plymouth-themes
 EOF
 
+mkdir -p /DATA/LIVE/CiszterciLinux/config/bootloaders/grub-pc
+cp /home/majorsza/forgejo/CiszterciLinux/design/ciszterci_linux_splash.png /DATA/LIVE/SleepyLinux/config/bootloaders/grub-pc/splash.png
+
 # autologin
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
 cat > config/includes.chroot/etc/lightdm/lightdm.conf.d/01-autologin.conf <<EOF
