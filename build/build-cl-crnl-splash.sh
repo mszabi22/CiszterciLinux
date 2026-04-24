@@ -257,6 +257,14 @@ dpkg -i teamviewer_amd64.deb || apt -f install -y
 rm teamviewer_amd64.deb
 
 # # #
+# AGE crypt
+AGE_VER=1.3.1
+curl -LO https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz
+tar xzf age-v${AGE_VER}-linux-amd64.tar.gz
+sudo install -m 0755 age/age age/age-keygen /usr/local/bin/
+rm age-v${AGE_VER}-linux-amd64.tar.gz
+
+# # #
 # VeraCrypt (Debian 13 = Trixie)
 wget https://launchpad.net/veracrypt/trunk/1.26.24/+download/veracrypt-1.26.24-Debian-13-amd64.deb
 dpkg -i veracrypt-1.26.24-Debian-13-amd64.deb || apt -f install -y
@@ -311,21 +319,15 @@ echo "ISO kész:"
 ls -lh *.iso
 
 ### javítás: ###
-#mount -t proc proc chroot/proc
-#mount -t sysfs sysfs chroot/sys
-#mount -o bind /dev chroot/dev
-#mount -o bind /dev/pts chroot/dev/pts
+#mount -t proc proc chroot/proc; mount -t sysfs sysfs chroot/sys; mount -o bind /dev chroot/dev; mount -o bind /dev/pts chroot/dev/pts; 
 
 #sudo chroot chroot /bin/bash
 
-#umount chroot/dev/pts
-#umount chroot/dev
-#umount chroot/proc
-#umount chroot/sys
-
+#umount chroot/dev/pts; umount chroot/dev; umount chroot/proc; umount chroot/sys
 #lb clean --binary
 #rm /DATA/LIVE/CiszterciLinux/chroot/etc/debian_chroot*
 #lb binary
+
 
 # ha csak az ISO-t kell:
 # rm .build/binary_iso
