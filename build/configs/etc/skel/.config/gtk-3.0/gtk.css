@@ -1,2 +1,1 @@
-.tasklist button { background-image: none; background-color: d4af34 ;}
-.tasklist button:checked { background-image: none; background-color: d4af34 ; border-color: red; }
+@import 'colors.css';
