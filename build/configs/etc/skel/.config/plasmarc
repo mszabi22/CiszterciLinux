@@ -1,0 +1,8 @@
+[OSD]
+Enabled=false
+
+[PlasmaToolTips]
+Delay=-1
+
+[Wallpapers]
+usersWallpapers=/usr/share/images/desktop-base/desktop-grub.png,/home/majorsza/pingvin_remote.png,/home/majorsza/Pilisszanto.jpg

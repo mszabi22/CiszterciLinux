@@ -1,0 +1,21 @@
+[CertifySettings]
+AdvancedOptionsExpanded=false
+ExportCheckState=false
+LastKey=3EE07CA261CFA310F7C45F25BFB620F335A55342
+PublishCheckState=false
+
+[Import Certificate]
+last-open-file-directory[$e]=$HOME/Letöltések/CONFIGS/PGP/Gmail
+
+[KeyTreeView_default]
+Expanded=C201D9C18DB2873606488DFF7DABA730A286D60B,2DE07BB6870E22819A6CB1C0F44AE405B2A7FC1E,3ABD611F9C1787CD41A5629EA7B0EC3A32538630
+
+[Self-Test]
+run-at-startup=false
+
+[SignEncryptFilesWizard]
+LastUseOutputDir=false
+
+[SignEncryptKeys]
+EncryptKey=3EE07CA261CFA310F7C45F25BFB620F335A55342
+SigningKey=3ABD611F9C1787CD41A5629EA7B0EC3A32538630

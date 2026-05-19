@@ -1,0 +1,56 @@
+[Calendar]
+Default Calendar=-1
+
+[CollectionTreeView]
+Expansion=c6
+HorizontalScroll=0
+VerticalScroll=0
+
+[General]
+CalendarFilters=
+Current Filter=
+Current View=Month
+Range Mode=5
+
+[GlobalCollectionSelection]
+Current=x-1
+Selection=c21,c19,c22,c24
+
+[GlobalCollectionView]
+Expansion=c6
+HorizontalScroll=0
+VerticalScroll=0
+
+[Internal Settings]
+DefaultResourceColorSeed=1
+
+[KOrganizer Geometry]
+Separator1=336,1583
+Separator2=243,0,303,363
+
+[Settings]
+DateNavigatorVisible=true
+EventViewerVisible=true
+ResourceViewVisible=true
+TodoViewVisible=false
+
+[Sidebar Todo View]
+ColumnOrder=0,1,2,3,4,5,6,7,8,9
+ColumnVisibility=true,false,false,false,true,true,false,false,false,false
+ColumnWidths=92,0,0,0,126,84,0,0,0,0
+SortAscending=1
+SortColumn=0
+
+[Timescale]
+Timescale Timezones=
+
+[TodoTreeViewStateS]
+Current=x-1
+Expansion=
+HorizontalScroll=0
+Selection=
+VerticalScroll=0
+
+[Views]
+Separator AgendaView=148,738
+ShownDatesCount=7
