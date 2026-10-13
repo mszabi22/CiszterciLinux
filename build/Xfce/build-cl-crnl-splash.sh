@@ -26,7 +26,7 @@ lb config noauto \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debootstrap-options "--variant=minbase" \
-  --bootappend-live "boot=live username=live persistence components hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
+  --bootappend-live "boot=live username=live persistence components quiet splash hostname=CiszterciLinux locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
   --image-name "$ISO_NAME" \
   --iso-application "$ISO_NAME" \
   --iso-publisher "Sleepy.hu" \
@@ -152,6 +152,7 @@ gocryptfs
 
 plymouth
 plymouth-themes
+lightdm-gtk-greeter-settings
 EOF
 
 # autologin
@@ -291,8 +292,16 @@ if [ -f /boot/grub/grub.cfg ]; then
   sed -i 's/Debian GNU\/Linux/CiszterciLinux/g' /boot/grub/grub.cfg
   sed -i 's/Live system/CiszterciLinux Live/g' /boot/grub/grub.cfg
 fi
+
+# Régi kernelek eltávolítása, csak a legújabb marad
+LATEST=$(ls /boot/vmlinuz-* | sed 's|/boot/vmlinuz-||' | sort -V | tail -n1)
+for k in $(dpkg -l 'linux-image-[0-9]*' | awk '/^ii/{print $2}' | grep -v "linux-image-${LATEST}"); do
+  apt-get -y purge "$k"
+done
+apt-get -y autoremove --purge
+
 plymouth-set-default-theme ciszterci
-update-initramfs -u
+update-initramfs -u -k all
 
 # # #
 echo "== FULL BUILD DONE =="
