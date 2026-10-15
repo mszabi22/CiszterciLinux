@@ -93,6 +93,16 @@ gparted
 zenity
 polkitd
 pkexec
+realmd
+sssd
+sssd-tools
+libnss-sss
+libpam-sss
+adcli
+samba-common-bin
+oddjob
+oddjob-mkhomedir
+packagekit 
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin

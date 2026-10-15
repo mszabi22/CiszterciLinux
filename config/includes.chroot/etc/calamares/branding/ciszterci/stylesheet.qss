@@ -1,4 +1,4 @@
-/* Kolibri Linux - telepítő stílus (a rendszer palettája: tengerkék, türkiz, borostyán) */
+/* Ciszterci Linux - telepítő stílus (a rendszer palettája: tengerkék, türkiz, borostyán) */
 * {
     font-family: "Noto Sans", "DejaVu Sans", sans-serif;
 }

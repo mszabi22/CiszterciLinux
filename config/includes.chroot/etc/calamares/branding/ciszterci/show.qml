@@ -1,4 +1,4 @@
-/* Kolibri Linux - telepítő diavetítés (Calamares slideshow API 2) */
+/* Ciszterci Linux - telepítő diavetítés (Calamares slideshow API 2) */
 import QtQuick 2.0;
 import calamares.slideshow 1.0;
 
@@ -48,7 +48,7 @@ Presentation {
                 color: "#e8eef4"
                 font.pixelSize: 28
                 font.bold: true
-                text: "Üdv a Kolibri Linuxban"
+                text: "Üdv a Ciszterci Linuxban"
             }
             Text {
                 width: parent.width
@@ -144,7 +144,7 @@ Presentation {
                 wrapMode: Text.WordWrap
                 color: "#b4c2d0"
                 font.pixelSize: 16
-                text: "A Kolibri Linux a Debian stabil ágára épül. A biztonsági frissítések automatikusan települnek, a Timeshift pedig segít, ha vissza kell lépni."
+                text: "A Ciszterci Linux a Debian stabil ágára épül. A biztonsági frissítések automatikusan települnek, a Timeshift pedig segít, ha vissza kell lépni."
             }
         }
     }

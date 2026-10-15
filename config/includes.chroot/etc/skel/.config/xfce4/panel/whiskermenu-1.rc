@@ -1,0 +1,14 @@
+favorites=brave-browser.desktop,exo-file-manager.desktop,libreoffice-writer.desktop,libreoffice-calc.desktop,org.keepassxc.KeePassXC.desktop,signal-desktop.desktop,com.tutanota.Tutanota.desktop,org.localsend.localsend_app.desktop,org.gnome.Software.desktop,xfce4-settings-manager.desktop
+button-icon=/usr/share/ciszterci/logo.png
+show-button-title=false
+show-button-icon=true
+button-single-row=false
+launcher-show-name=true
+launcher-show-description=false
+view-mode=0
+view-as-icons=false
+recent-items-max=10
+favorites-in-recent=true
+position-search-alternate=true
+position-commands-alternate=false
+position-categories-alternate=true
