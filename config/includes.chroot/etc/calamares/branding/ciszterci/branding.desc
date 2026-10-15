@@ -1,6 +1,6 @@
-# Kolibri Linux - Calamares telepítő arculat
+# Ciszterci Linux - Calamares telepítő arculat
 ---
-componentName:  kolibri
+componentName:  ciszterci
 
 welcomeStyleCalamares:   true
 welcomeExpandingLogo:    true
@@ -9,13 +9,13 @@ windowSize:         960px,600px
 windowPlacement:    center
 
 strings:
-    productName:         Kolibri Linux
-    shortProductName:    Kolibri
+    productName:         Ciszterci Linux
+    shortProductName:    Ciszterci
     version:             1.0
     shortVersion:        1.0
-    versionedName:       Kolibri Linux 1.0
-    shortVersionedName:  Kolibri 1.0
-    bootloaderEntryName: Kolibri Linux
+    versionedName:       Ciszterci Linux
+    shortVersionedName:  Ciszterci 1.0
+    bootloaderEntryName: Ciszterci Linux
     productUrl:          "https://linux.crnl.hu"
     supportUrl:          ""
     knownIssuesUrl:      ""

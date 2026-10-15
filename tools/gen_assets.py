@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kolibri Linux - arculati elemek generálása (Plymouth, GRUB, syslinux).
+"""Ciszterci Linux - arculati elemek generálása (Plymouth, GRUB, syslinux).
 Futtatás: python3 tools/gen_assets.py   (kell hozzá: python3-pil, fonts-dejavu-core)
 """
 import os
@@ -7,8 +7,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INC = os.path.join(ROOT, "config/includes.chroot")
-PLY = os.path.join(INC, "usr/share/plymouth/themes/kolibri")
-GRUB = os.path.join(INC, "usr/share/kolibri/grub")
+PLY = os.path.join(INC, "usr/share/plymouth/themes/ciszterci")
+GRUB = os.path.join(INC, "usr/share/ciszterci/grub")
 BOOT = os.path.join(ROOT, "config/bootloaders")
 for d in (PLY, GRUB, os.path.join(BOOT, "grub-pc"), os.path.join(BOOT, "syslinux")):
     os.makedirs(d, exist_ok=True)
@@ -30,7 +30,7 @@ def gradient(w, h):
     return img
 
 def bird(size=512, alpha=255):
-    """Geometrikus (low-poly) kolibri, balra néz. Támogatott méret: tetszőleges, 512-es rácson rajzolva."""
+    """Geometrikus (low-poly) ciszterci, balra néz. Támogatott méret: tetszőleges, 512-es rácson rajzolva."""
     S = 4
     im = Image.new("RGBA", (512 * S, 512 * S), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
@@ -64,9 +64,9 @@ def font(path, px):
 def wordmark(px=64, color=TEXT):
     f = font(FB, px)
     tmp = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    box = tmp.textbbox((0, 0), "Kolibri", font=f)
+    box = tmp.textbbox((0, 0), "Ciszterci", font=f)
     im = Image.new("RGBA", (box[2] + 8, box[3] + 16), (0, 0, 0, 0))
-    ImageDraw.Draw(im).text((4, 0), "Kolibri", font=f, fill=color + (255,))
+    ImageDraw.Draw(im).text((4, 0), "Ciszterci", font=f, fill=color + (255,))
     return im.crop(im.getbbox())
 
 def centered(canvas, im, cx, y):
@@ -107,8 +107,8 @@ g.convert("RGB").save(os.path.join(GRUB, "background.png"))
 g.convert("RGB").save(os.path.join(BOOT, "grub-pc", "splash.png"))
 
 # ---------- Asztal háttér (ugyanaz a kép, mint a GRUB-é) és Start gomb ikon ----------
-WALL = os.path.join(INC, "usr/share/backgrounds/kolibri")
-KOL = os.path.join(INC, "usr/share/kolibri")
+WALL = os.path.join(INC, "usr/share/backgrounds/ciszterci")
+KOL = os.path.join(INC, "usr/share/ciszterci")
 os.makedirs(WALL, exist_ok=True); os.makedirs(KOL, exist_ok=True)
 g.convert("RGB").save(os.path.join(WALL, "background.png"))
 bird(256).save(os.path.join(KOL, "logo.png"))
