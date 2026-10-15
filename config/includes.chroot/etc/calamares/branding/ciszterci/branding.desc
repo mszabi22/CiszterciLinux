@@ -1,0 +1,40 @@
+# Kolibri Linux - Calamares telepítő arculat
+---
+componentName:  kolibri
+
+welcomeStyleCalamares:   true
+welcomeExpandingLogo:    true
+windowExpanding:    normal
+windowSize:         960px,600px
+windowPlacement:    center
+
+strings:
+    productName:         Kolibri Linux
+    shortProductName:    Kolibri
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       Kolibri Linux 1.0
+    shortVersionedName:  Kolibri 1.0
+    bootloaderEntryName: Kolibri Linux
+    productUrl:          "https://linux.crnl.hu"
+    supportUrl:          ""
+    knownIssuesUrl:      ""
+    releaseNotesUrl:     ""
+    donateUrl:           ""
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "icon.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+slideshowAPI: 2
+
+style:
+    SidebarBackground:        "#0b1f33"
+    SidebarText:              "#e8eef4"
+    SidebarTextCurrent:       "#06111e"
+    SidebarBackgroundCurrent: "#2ec4b6"
+    # régebbi Calamares-verziók kulcsnevei
+    SidebarTextSelect:        "#06111e"
+    SidebarTextHighlight:     "#2ec4b6"

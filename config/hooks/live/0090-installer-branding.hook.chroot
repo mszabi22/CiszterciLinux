@@ -1,0 +1,22 @@
+#!/bin/bash
+# Calamares telepítő: ciszterci arculat bekapcsolása (a 0100 hook előtt kell lefutnia,
+# mert az másolja az indítót az asztalra).
+set -e
+
+CONF=/etc/calamares/settings.conf
+if [ -f "$CONF" ]; then
+    if grep -q '^branding:' "$CONF"; then
+        sed -i 's/^branding:.*/branding: ciszterci/' "$CONF"
+    else
+        echo 'branding: ciszterci' >> "$CONF"
+    fi
+fi
+
+# Az asztali indító neve és ikonja is ciszterci legyen
+for f in /usr/share/applications/calamares.desktop /usr/share/applications/install-debian.desktop; do
+    [ -f "$f" ] || continue
+    sed -i -e '/^Name\[.*\]=/d' -e '/^GenericName\[.*\]=/d' -e '/^Comment\[.*\]=/d' \
+           -e 's/^Name=.*/Name=Ciszterci Linux telepítése/' \
+           -e 's|^Icon=.*|Icon=/usr/share/ciszterci/logo.png|' "$f"
+done
+exit 0

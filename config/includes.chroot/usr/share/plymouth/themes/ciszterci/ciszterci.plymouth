@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=CRNL
+Description=Kozepre igazitott logo es toltocsik
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/ciszterci
+ScriptFile=/usr/share/plymouth/themes/ciszterci/ciszterci.script
