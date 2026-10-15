@@ -1,4 +1,0 @@
-[TimeZones]
-LocalZone=Europe/Budapest
-ZoneinfoDir=/usr/share/zoneinfo
-Zonetab=/usr/share/zoneinfo/zone.tab
