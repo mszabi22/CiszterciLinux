@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 ### javítás: ###
 mount -t proc proc chroot/proc; mount -t sysfs sysfs chroot/sys; mount -o bind /dev chroot/dev; mount -o bind /dev/pts chroot/dev/pts; 
