@@ -103,7 +103,7 @@ samba-common-bin
 oddjob
 oddjob-mkhomedir
 packagekit 
-
+grub-customizer
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
 xfce4-pulseaudio-plugin
