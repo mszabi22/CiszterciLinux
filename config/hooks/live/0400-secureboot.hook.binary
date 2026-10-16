@@ -1,4 +1,42 @@
-shim-signed
-grub-efi-amd64-signed
-grub-efi-amd64
-efibootmgr
+#!/bin/bash
+# Secure Boot támogatás az élő ISO-hoz: az efi.img-t az aláírt
+# shim -> grub láncból építjük újra. A binary_iso lépés előtt fut.
+# Függ: shim-signed, grub-efi-amd64-signed a chrootban (kolibri.list.chroot),
+#       dosfstools + mtools a build gépen (build.sh apt-get sora).
+set -e
+
+SHIM=chroot/usr/lib/shim/shimx64.efi.signed
+MM=chroot/usr/lib/shim/mmx64.efi.signed
+GRUB=chroot/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed
+IMG=binary/boot/grub/efi.img
+
+for f in "$SHIM" "$MM" "$GRUB"; do
+    [ -f "$f" ] || { echo "HIBA: hiányzik: $f (shim-signed / grub-efi-amd64-signed a chrootban?)"; exit 1; }
+done
+[ -d binary/boot/grub ] || { echo "HIBA: binary/boot/grub nincs, rossz munkakönyvtár?"; exit 1; }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/EFI/boot" "$T/EFI/debian"
+
+cp "$SHIM"  "$T/EFI/boot/bootx64.efi"
+cp "$MM"    "$T/EFI/boot/mmx64.efi"
+cp "$GRUB"  "$T/EFI/boot/grubx64.efi"
+cp "$GRUB"  "$T/EFI/debian/grubx64.efi"
+
+# Az aláírt GRUB a saját prefixéből olvas konfigot; innen az ISO-n lévőre ugrunk.
+cat > "$T/EFI/boot/grub.cfg" <<'EOF'
+search --file --set=root /boot/grub/grub.cfg
+set prefix=($root)/boot/grub
+configfile /boot/grub/grub.cfg
+EOF
+cp "$T/EFI/boot/grub.cfg" "$T/EFI/debian/grub.cfg"
+
+rm -f "$IMG"
+truncate -s 16M "$IMG"
+mkfs.vfat -n CISZTERCI_EFI "$IMG" >/dev/null
+mcopy -s -i "$IMG" "$T/EFI" ::
+
+# Ellenőrzés a build naplójában
+mdir -/ -i "$IMG" ::EFI
+exit 0
