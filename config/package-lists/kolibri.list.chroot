@@ -105,6 +105,12 @@ oddjob-mkhomedir
 packagekit 
 grub-customizer
 mokutil
+grub-pc-bin
+grub-efi-amd64
+grub-efi-amd64-signed
+shim-signed
+efibootmgr
+
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
