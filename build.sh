@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 [ "$(id -u)" -eq 0 ] || { echo "Root kell: sudo ./build.sh"; exit 1; }
 
-apt-get install -y live-build debootstrap squashfs-tools xorriso curl gnupg jq
+apt-get install -y live-build debootstrap squashfs-tools xorriso curl gnupg jq dosfstools mtools
 
 INC=config/includes.chroot
 mkdir -p "$INC/usr/share/keyrings" "$INC/opt/kolibri-debs"

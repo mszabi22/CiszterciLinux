@@ -1,0 +1,4 @@
+shim-signed
+grub-efi-amd64-signed
+grub-efi-amd64
+efibootmgr
