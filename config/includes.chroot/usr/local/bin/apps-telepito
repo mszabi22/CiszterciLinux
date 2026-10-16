@@ -13,7 +13,7 @@
 
 APPS_DIR="/usr/local/bin/apps"
 NAMES_FILE="$APPS_DIR/names.txt"
-TITLE="Programtelepítő"
+TITLE="MyApps - Programtelepítő"
 SELF="$(readlink -f "$0")"
 
 trim() {

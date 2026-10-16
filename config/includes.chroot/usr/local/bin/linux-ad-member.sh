@@ -40,4 +40,6 @@ skel_dir = /etc/skel" > /etc/sssd/sssd.conf
 systemctl restart sssd 
 #realm leave --user=mszabi samba.crnl.lan
 
+echo "/usr/bin/rm -rf /home/samba.crnl.lan/*" >> /etc/rc.local
+mcedit /etc/rc.local
 
