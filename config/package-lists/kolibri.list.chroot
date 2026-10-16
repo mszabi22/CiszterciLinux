@@ -104,6 +104,8 @@ oddjob
 oddjob-mkhomedir
 packagekit 
 grub-customizer
+mokutil
+
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
 xfce4-pulseaudio-plugin
