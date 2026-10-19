@@ -1,0 +1,4 @@
+# fájlnév | Megjelenő név | Leírás
+pycharm-install.sh | PyCharm | PyCharm telepítése
+vs_code-install.sh | VS Code | VS Code telepítése
+xampp-install.sh | XAMPP | XAMPP telepítése
