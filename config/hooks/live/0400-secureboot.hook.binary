@@ -1,30 +1,36 @@
 #!/bin/bash
 # Secure Boot támogatás az élő ISO-hoz: az efi.img-t az aláírt
 # shim -> grub láncból építjük újra. A binary_iso lépés előtt fut.
-# Függ: shim-signed, grub-efi-amd64-signed a chrootban (kolibri.list.chroot),
-#       dosfstools + mtools a build gépen (build.sh apt-get sora).
 set -e
 
-SHIM=chroot/usr/lib/shim/shimx64.efi.signed
-MM=chroot/usr/lib/shim/mmx64.efi.signed
-GRUB=chroot/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed
 IMG=binary/boot/grub/efi.img
-
-for f in "$SHIM" "$MM" "$GRUB"; do
-    [ -f "$f" ] || { echo "HIBA: hiányzik: $f (shim-signed / grub-efi-amd64-signed a chrootban?)"; exit 1; }
-done
 [ -d binary/boot/grub ] || { echo "HIBA: binary/boot/grub nincs, rossz munkakönyvtár?"; exit 1; }
+
+# Az első létező fájlt adja vissza (a trixie-ben a shim fájlok .latest végződést kaphatnak)
+pick() { for p in "$@"; do [ -f "$p" ] && { echo "$p"; return 0; }; done; return 1; }
+
+S=chroot/usr/lib/shim
+G=chroot/usr/lib/grub/x86_64-efi-signed
+SHIM=$(pick $S/shimx64.efi.signed $S/shimx64.efi.signed.latest $S/shimx64.efi.signed.previous) || true
+MM=$(pick   $S/mmx64.efi.signed   $S/mmx64.efi.signed.latest   $S/mmx64.efi.signed.previous)   || true
+GRUB=$(pick $G/grubx64.efi.signed) || true
+
+if [ -z "$SHIM" ] || [ -z "$MM" ] || [ -z "$GRUB" ]; then
+    echo "HIBA: nem találom az aláírt EFI fájlokat. Ami van:"
+    ls -l $S $G 2>&1 || true
+    exit 1
+fi
+echo "shim: $SHIM"; echo "mm:   $MM"; echo "grub: $GRUB"
 
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/EFI/boot" "$T/EFI/debian"
 
-cp "$SHIM"  "$T/EFI/boot/bootx64.efi"
-cp "$MM"    "$T/EFI/boot/mmx64.efi"
-cp "$GRUB"  "$T/EFI/boot/grubx64.efi"
-cp "$GRUB"  "$T/EFI/debian/grubx64.efi"
+cp "$SHIM" "$T/EFI/boot/bootx64.efi"
+cp "$MM"   "$T/EFI/boot/mmx64.efi"
+cp "$GRUB" "$T/EFI/boot/grubx64.efi"
+cp "$GRUB" "$T/EFI/debian/grubx64.efi"
 
-# Az aláírt GRUB a saját prefixéből olvas konfigot; innen az ISO-n lévőre ugrunk.
 cat > "$T/EFI/boot/grub.cfg" <<'EOF'
 search --file --set=root /boot/grub/grub.cfg
 set prefix=($root)/boot/grub
@@ -37,6 +43,5 @@ truncate -s 16M "$IMG"
 mkfs.vfat -n CISZTERCI_EFI "$IMG" >/dev/null
 mcopy -s -i "$IMG" "$T/EFI" ::
 
-# Ellenőrzés a build naplójában
 mdir -/ -i "$IMG" ::EFI
 exit 0
