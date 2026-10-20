@@ -1,0 +1,36 @@
+# Hatter
+Window.SetBackgroundTopColor(0.000, 0.000, 0.000);
+Window.SetBackgroundBottomColor(0.000, 0.000, 0.000);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+
+# Logo kozepre, a kepernyo magassaganak 38%-ara skalazva
+logo.orig = Image("logo.png");
+logo_h = Math.Int(screen_h * 38 / 100);
+logo_w = Math.Int(logo.orig.GetWidth() * logo_h / logo.orig.GetHeight());
+logo.image = logo.orig.Scale(logo_w, logo_h);
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Math.Int(screen_w / 2 - logo_w / 2));
+logo.sprite.SetY(Math.Int(screen_h / 2 - logo_h / 2));
+
+# Toltocsik
+bar_w = Math.Int(screen_w * 30 / 100);
+bar_h = Math.Int(screen_h * 0.004);
+if (bar_h < 3) bar_h = 3;
+bar_x = Math.Int(screen_w / 2 - bar_w / 2);
+bar_y = Math.Int(screen_h * 85 / 100);
+
+bar.image = Image("bar.png");
+bar.sprite = Sprite();
+bar.sprite.SetX(bar_x);
+bar.sprite.SetY(bar_y);
+bar.sprite.SetImage(bar.image.Scale(1, bar_h));
+
+fun progress_callback(duration, progress) {
+    w = Math.Int(bar_w * progress);
+    if (w < 1) w = 1;
+    bar.sprite.SetImage(bar.image.Scale(w, bar_h));
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);

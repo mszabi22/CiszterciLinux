@@ -1,0 +1,10 @@
+#!/bin/bash
+# Ha a build közben nem sikerült a Flatpak-előtelepítés, itt pótoljuk (internet kell).
+APPS="com.tutanota.Tutanota org.localsend.localsend_app"
+mkdir -p /var/lib/kolibri
+flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+missing=""
+for a in $APPS; do flatpak info --system "$a" >/dev/null 2>&1 || missing="$missing $a"; done
+if [ -z "$missing" ] || flatpak install --system -y --noninteractive flathub $missing; then
+  touch /var/lib/kolibri/flatpak-apps-done
+fi

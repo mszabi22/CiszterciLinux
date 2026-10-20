@@ -1,0 +1,36 @@
+#!/bin/bash
+# Alkalmazások: legfrissebb LibreOffice (backports), Brave, Signal, VeraCrypt, Flatpak appok.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+
+# LibreOffice a trixie-backports-ból (a task-desktop által húzott stabil verziót is lecseréli)
+apt-get install -y -t trixie-backports \
+    libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-draw \
+    libreoffice-gtk3 libreoffice-l10n-hu libreoffice-help-hu
+
+# Brave és Signal a gyártók saját APT tárolójából
+apt-get install -y brave-browser signal-desktop
+
+# VeraCrypt (a build.sh töltötte le a hivatalos Debian 13 csomagot)
+if ls /opt/kolibri-debs/veracrypt-*.deb >/dev/null 2>&1; then
+    apt-get install -y /opt/kolibri-debs/veracrypt-*.deb
+fi
+rm -rf /opt/kolibri-debs
+
+# Firefox legyen az alapértelmezett böngésző
+update-alternatives --set x-www-browser /usr/bin/firefox-esr || true
+update-alternatives --set gnome-www-browser /usr/bin/firefox-esr || true
+
+# Flatpak: Tuta Mail és LocalSend (ha itt nem sikerül, első indításkor pótolja a szolgáltatás)
+flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+if flatpak install --system -y --noninteractive flathub com.tutanota.Tutanota org.localsend.localsend_app; then
+    mkdir -p /var/lib/kolibri && touch /var/lib/kolibri/flatpak-apps-done
+else
+    echo "FIGYELEM: Flatpak előtelepítés sikertelen, első indításkor pótolódik."
+fi
+
+systemctl enable kolibri-ufw.service kolibri-flatpak-apps.service rc-local || true
+apt-get clean
+exit 0
