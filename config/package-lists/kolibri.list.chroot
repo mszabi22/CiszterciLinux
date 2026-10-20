@@ -110,7 +110,7 @@ grub-efi-amd64
 grub-efi-amd64-signed
 shim-signed
 efibootmgr
-
+fwupd
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
