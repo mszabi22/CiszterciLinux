@@ -11,9 +11,9 @@ windowPlacement:    center
 strings:
     productName:         Ciszterci Linux
     shortProductName:    Ciszterci
-    version:             1.0
-    shortVersion:        1.0
-    versionedName:       Ciszterci Linux
+    version:             26.10
+    shortVersion:        26.10
+    versionedName:       Ciszterci Linux 26.10
     shortVersionedName:  Ciszterci Linux 26.10
     bootloaderEntryName: Ciszterci Linux
     productUrl:          "https://linux.crnl.hu"
