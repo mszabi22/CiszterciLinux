@@ -111,7 +111,8 @@ grub-efi-amd64-signed
 shim-signed
 efibootmgr
 fwupd
-
+veyon-services
+veyon-configurator
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
