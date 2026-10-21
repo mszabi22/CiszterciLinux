@@ -6,6 +6,7 @@ for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
   for proto in tcp udp; do
     ufw allow from "$net" to any port 53317 proto "$proto" comment 'LocalSend' >/dev/null
     ufw allow from "$net" to any port 22 proto "$proto" comment 'SSH' >/dev/null
+    ufw allow from "$net" to any port 11100 proto "$proto" comment 'Veyon Service' >/dev/null
   done
 done
 touch /var/lib/kolibri/ufw-localsend-done
