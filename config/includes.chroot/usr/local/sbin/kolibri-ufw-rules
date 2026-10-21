@@ -1,0 +1,10 @@
+#!/bin/bash
+# LocalSend (53317/tcp+udp) engedélyezése, de csak a helyi (privát) hálózatokról.
+set -e
+mkdir -p /var/lib/kolibri
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+  for proto in tcp udp; do
+    ufw allow from "$net" to any port 53317 proto "$proto" comment 'LocalSend' >/dev/null
+  done
+done
+touch /var/lib/kolibri/ufw-localsend-done

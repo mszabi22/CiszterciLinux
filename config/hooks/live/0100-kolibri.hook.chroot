@@ -1,0 +1,31 @@
+#!/bin/bash
+# A chrootban fut a build végén.
+set -e
+
+# Arculat: a kompatibilitás miatt az ID marad debian, csak a megjelenő név változik
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Ciszterci Linux 26.10"/' /etc/os-release
+echo "Ciszterci Linux \n \l" > /etc/issue
+
+# Flathub hozzáadása (build közben kell hálózat)
+flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+
+# Biztonsági szolgáltatások induláskor
+systemctl enable ufw.service || true
+systemctl enable unattended-upgrades.service || true
+systemctl enable NetworkManager.service || true
+systemctl enable rc-local || true
+systemctl enable ssh-hostkeys.service || true
+
+# Magyar alapbeállítások a telepített rendszerhez
+echo "Europe/Budapest" > /etc/timezone
+ln -sf /usr/share/zoneinfo/Europe/Budapest /etc/localtime
+sed -i 's/^# *hu_HU.UTF-8/hu_HU.UTF-8/' /etc/locale.gen
+locale-gen
+update-locale LANG=hu_HU.UTF-8
+
+# Telepítő indítója az élő asztalon
+mkdir -p /etc/skel/Desktop
+for f in /usr/share/applications/calamares.desktop /usr/share/applications/install-debian.desktop; do
+  [ -f "$f" ] && cp "$f" /etc/skel/Desktop/ && chmod +x /etc/skel/Desktop/"$(basename "$f")"
+done
+exit 0
