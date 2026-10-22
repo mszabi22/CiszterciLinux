@@ -7,15 +7,8 @@ if [ -d /usr/share/plymouth/themes/ciszterci ]; then
 fi
 
 # GRUB menü: "Ciszterci Linux GNU/Linux" helyett "Ciszterci Linux".
-# A 10_linux szkriptet eltereljük (dpkg-divert), így a grub csomag frissítése nem írja felül a megoldást.
-if [ -f /etc/grub.d/10_linux ] && ! dpkg-divert --list | grep -q '10_linux.real'; then
-    dpkg-divert --local --rename --divert /etc/grub.d/10_linux.real --add /etc/grub.d/10_linux
-    cat > /etc/grub.d/10_linux <<'WRAP'
-#!/bin/bash
-# Ciszterci Linux: a menüben "Ciszterci Linux" jelenjen meg ("... GNU/Linux" nélkül)
-set -o pipefail
-/etc/grub.d/10_linux.real "$@" | sed 's/Ciszterci Linux GNU\/Linux/Ciszterci Linux/g'
-WRAP
-    chmod +x /etc/grub.d/10_linux
-fi
+# A 10_linux-hoz nem nyúlunk (nincs divert): minden apt/dpkg futás után átírjuk a grub.cfg-t.
+cat > /etc/apt/apt.conf.d/99ciszterci-grub <<'EOF'
+DPkg::Post-Invoke { "[ -f /boot/grub/grub.cfg ] && sed -i 's|Ciszterci Linux GNU/Linux|Ciszterci Linux|g' /boot/grub/grub.cfg || true"; };
+EOF
 exit 0

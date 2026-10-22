@@ -103,7 +103,6 @@ samba-common-bin
 oddjob
 oddjob-mkhomedir
 packagekit 
-grub-customizer
 mokutil
 grub-pc-bin
 grub-efi-amd64
