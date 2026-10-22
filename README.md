@@ -120,7 +120,7 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 
 ## Hozzájárulás
 
-Hibát találtál, vagy van ötleted? Írj a projekt weboldalán található [kapcsolati oldalon](https://linux.crnl.hu/kapcsolat.php). Csomaglista-módosításokat, fordításokat és arculati javaslatokat is szívesen fogadunk.
+Hibát találtál, vagy van ötleted? Írj a projekt weboldalán található [kapcsolati oldalon](https://linux.crnl.hu/kapcsolat.php). Csomaglista-módosításokat és arculati javaslatokat is szívesen fogadunk.
 
 ## Licenc és jogi tudnivalók
 
