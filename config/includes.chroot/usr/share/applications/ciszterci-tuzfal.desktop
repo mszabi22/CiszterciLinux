@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ciszterci tűzfal
+Name[hu]=Ciszterci tűzfal
+GenericName=Tűzfal
+Comment=Az iptables tűzfal egyszerű, grafikus kezelése
+Exec=/usr/local/bin/ciszterci-tuzfal
+Icon=ciszterci-tuzfal
+Terminal=false
+Categories=System;Security;
+Keywords=tűzfal;firewall;iptables;nat;hálózat;
