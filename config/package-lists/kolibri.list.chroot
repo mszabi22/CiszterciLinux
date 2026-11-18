@@ -59,8 +59,6 @@ gnome-software-plugin-flatpak
 # --- Stabilitás, biztonság, visszaállítás ---
 unattended-upgrades
 apt-listchanges
-ufw
-gufw
 timeshift
 gparted
 smartmontools
@@ -125,4 +123,4 @@ keepassxc
 geany
 geany-plugins
 kleopatra
-nextcloud-desktop
+
