@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+# A backportsot a kolibri-backports.sources adja (contrib-bal), a Calamares ne írja be még egyszer
+f=/usr/share/calamares/helpers/calamares-sources-final
+sed -i '/^# Backports allow you/d; /-backports main/d' "$f"
+grep -q backports "$f" && { echo "HIBA: backports sor maradt a $f-ben"; exit 1; } || true

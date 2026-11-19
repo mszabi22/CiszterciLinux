@@ -1,0 +1,30 @@
+#!/bin/bash
+# A telepített rendszerbe /etc/grub.d/99_ciszterci_efi kerül: minden grub-mkconfig / update-grub
+# (így a Calamares telepítés végén is) gondoskodik róla, hogy az ESP-n az aláírt GRUB által
+# keresett /EFI/debian/grub.cfg stub létezzen és a /boot/grub/grub.cfg-re mutasson.
+set -e
+cat > /etc/grub.d/99_ciszterci_efi <<'WRAP'
+#!/bin/sh
+# Ciszterci Linux: EFI grub.cfg stub karbantartása (nem ír a grub.cfg-be)
+exec 1>/dev/null
+ESP=/boot/efi
+mountpoint -q "$ESP" || exit 0
+[ -d "$ESP/EFI" ] || exit 0
+UUID=$(grub-probe --target=fs_uuid /boot/grub 2>/dev/null) || exit 0
+REL=$(grub-mkrelpath /boot/grub 2>/dev/null) || exit 0
+[ -n "$UUID" ] && [ -n "$REL" ] || exit 0
+mkdir -p "$ESP/EFI/debian"
+TMP=$(mktemp)
+cat > "$TMP" <<STUB
+search.fs_uuid $UUID root
+set prefix=(\$root)'$REL'
+configfile \$prefix/grub.cfg
+STUB
+if ! cmp -s "$TMP" "$ESP/EFI/debian/grub.cfg" 2>/dev/null; then
+    cp "$TMP" "$ESP/EFI/debian/grub.cfg"
+fi
+rm -f "$TMP"
+exit 0
+WRAP
+chmod +x /etc/grub.d/99_ciszterci_efi
+exit 0

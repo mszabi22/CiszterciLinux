@@ -1,0 +1,19 @@
+#!/bin/sh
+# Ciszterci Linux
+lb config noauto \
+    --distribution trixie \
+    --architectures amd64 \
+    --archive-areas "main contrib non-free-firmware" \
+    --parent-archive-areas "main contrib non-free-firmware" \
+    --security true \
+    --updates true \
+    --binary-images iso-hybrid \
+    --debian-installer none \
+    --iso-application "Ciszterci Linux" \
+    --iso-publisher "Ciszterci Linux" \
+    --iso-volume "CiszterciLinux" \
+    --image-name ciszterci \
+    --apt-recommends true \
+    --memtest none \
+    --bootappend-live "boot=live components quiet splash locales=hu_HU.UTF-8 keyboard-layouts=hu timezone=Europe/Budapest" \
+    "${@}"

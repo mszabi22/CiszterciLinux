@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MyApps
+GenericName=Programok telepítése
+Comment=Szükséges programok telepítése saját listáról
+Exec=/usr/local/bin/apps-telepito
+Icon=system-software-install
+Terminal=false
+Categories=System;Settings;
+Keywords=telepítés;program;install;
