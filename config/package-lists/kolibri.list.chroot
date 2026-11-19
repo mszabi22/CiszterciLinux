@@ -62,6 +62,8 @@ apt-listchanges
 timeshift
 gparted
 smartmontools
+iptables
+iptables-persistent
 
 # --- Firmware és codecek, system-tools ---
 firmware-linux

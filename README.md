@@ -29,7 +29,7 @@ A rendszer iskolai és oktatási környezetbe készült, de bárki használhatja
 - **Debian-alapú stabilitás.** A stabil ágra épül, automatikus biztonsági frissítésekkel.
 - **Visszaállíthatóság.** A Timeshift segítségével a rendszer bármikor visszaállítható egy korábbi állapotba.
 - **Kezdőbarát.** Windows-szerű asztal, magyar nyelv és billentyűzet, egyszerű telepítő, grafikus szoftverközpont.
-- **Adatvédelem.** Előtelepített titkosító és privát kommunikációs eszközök, alapból bekapcsolt tűzfal.
+- **Adatvédelem.** Előtelepített titkosító és privát kommunikációs eszközök.
 - **Kipróbálható telepítés nélkül.** Élő rendszerként vagy virtuális gépben (például VirtualBoxban) is futtatható.
 - **Haladóknak is.** Bash, rendszergazdai feladatok, scriptelés: a mélységre mindig van lehetőség.
 - **Szabad és ingyenes.** Nem kell hozzá licenc és regisztráció.
@@ -115,7 +115,6 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 - **Elrendezés.** Windows-szerű: alul tálca, balra Start menü (Whisker menü, Super gomb), jobbra tálcaikonok, hangerő, akkumulátor, óra és az „asztal megjelenítése" gomb. `Win+E` a fájlkezelő. A beállítások helye: `config/includes.chroot/etc/skel/.config/xfce4/`
 - **Háttér és bejelentkező képernyő.** Ugyanaz a kép, mint a GRUB-ban: `/usr/share/backgrounds/ciszterci/background.png`
 - **Alkalmazások letöltése.** A `build.sh` és a `config/hooks/live/0050-apps.hook.chroot` tartalmazza a külső forrásból érkező programok telepítését.
-- **LocalSend.** 
 - **VeraCrypt.** A `.deb` csomag nem frissül magától: új verzióhoz új ISO kell, vagy kézi telepítés.
 
 ## Hozzájárulás
