@@ -1,3 +1,0 @@
-Unattended-Upgrade::Origins-Pattern:: "origin=Debian,codename=${distro_codename}-backports,label=Debian Backports";
-Unattended-Upgrade::Origins-Pattern:: "site=brave-browser-apt-release.s3.brave.com";
-Unattended-Upgrade::Origins-Pattern:: "site=updates.signal.org";
