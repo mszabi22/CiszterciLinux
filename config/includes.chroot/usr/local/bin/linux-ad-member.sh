@@ -102,6 +102,7 @@ krb5_store_password_if_offline = True
 cache_credentials = True
 krb5_realm = ${DOMAIN^^}
 realmd_tags = manages-system joined-with-adcli
+id_provider = ad
 ldap_id_mapping = True
 fallback_homedir = /home/%d/%u
 ad_domain = $DOMAIN
