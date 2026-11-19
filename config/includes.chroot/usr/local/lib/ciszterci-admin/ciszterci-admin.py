@@ -7,6 +7,7 @@ A jogosultságot pkexec adja: egyetlen hitelesítés után egy szűk műveletké
 dolgozik (nem tetszőleges parancsokat futtat). Eltávolítás: ciszterci-admin --uninstall
 """
 import sys, os, json, re, shlex, subprocess, shutil, hashlib, time, threading, urllib.request, datetime
+import base64, ipaddress
 
 LIBDIR = "/usr/local/lib/ciszterci-admin"
 INSTALL_PATH = LIBDIR + "/ciszterci-admin.py"      # root tulajdonú példány, ezt futtatja a pkexec
@@ -346,7 +347,7 @@ def op_login(r):
     return "Mentve. A változás a következő bejelentkező képernyőnél lép életbe (kijelentkezés után)."
 
 
-PKG_WHITELIST = {"chrony", "nextcloud-desktop"}
+PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools"}
 
 
 def op_pkg(r):
@@ -479,15 +480,330 @@ def op_time(r):
     return "Az idő beállítva. (Az internetes szinkron, ha be volt kapcsolva, újraindításkor visszaáll.)"
 
 
+# ------------------------------------------------------------------ WireGuard
+# A profilok az /etc/wireguard/<név>.conf fájlokban vannak (root:root, 0600), a kapcsolást
+# a wg-quick végzi. A root segéd a GUI-tól NEM nyers konfigot fogad (abban PostUp/PreUp
+# parancsok lehetnének), hanem ellenőrzött mezőket, és abból maga állítja össze a fájlt.
+WG_DIR = "/etc/wireguard"
+WG_NAME_RE = re.compile(r"[A-Za-z0-9_=+.-]{1,15}")      # Linux interfésznév-korlát
+WG_KEY_RE = re.compile(r"[A-Za-z0-9+/]{43}=")
+WG_IFACE_KEYS = {"privatekey", "address", "dns", "mtu"}
+WG_PEER_KEYS = {"publickey", "presharedkey", "endpoint", "allowedips", "persistentkeepalive"}
+
+
+def wg_key_ok(k):
+    if not WG_KEY_RE.fullmatch(k or ""):
+        return False
+    try:
+        return len(base64.b64decode(k, validate=True)) == 32
+    except ValueError:
+        return False
+
+
+def wg_split(s):
+    return [x for x in re.split(r"[\s,;]+", (s or "").strip()) if x]
+
+
+def wg_pubkey(priv):
+    """Kliens nyilvános kulcs a privátból (a wg pubkey stdin-ről olvas, a kulcs nem kerül parancssorba)."""
+    if not wg_key_ok(priv):
+        return ""
+    try:
+        r = subprocess.run(["wg", "pubkey"], input=priv + "\n", capture_output=True, text=True, timeout=10)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def wg_active(name):
+    """Fel van-e hozva a profil WireGuard-interfésze (root nélkül is kiolvasható)."""
+    try:
+        with open(f"/sys/class/net/{name}/uevent") as f:
+            return "DEVTYPE=wireguard" in f.read()
+    except OSError:
+        return False
+
+
+def wg_parse_text(text):
+    iface, peers, cur = {}, [], None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        low = line.lower()
+        if low == "[interface]":
+            cur = iface
+        elif low == "[peer]":
+            cur = {}
+            peers.append(cur)
+        elif low.startswith("["):
+            cur = {}                                  # ismeretlen szakasz: eldobjuk
+        elif "=" in line and cur is not None:
+            k, v = line.split("=", 1)
+            cur.setdefault(k.strip().lower(), []).append(v.strip())
+    return iface, peers
+
+
+def wg_fields(iface, peers):
+    """Az űrlapmezők + az 'extra' (nem támogatott) kulcsok listája. simple=True: itt szerkeszthető."""
+    def j(d, k):
+        return ", ".join(x for v in d.get(k, []) for x in wg_split(v))
+
+    def first(d, k):
+        return (d.get(k) or [""])[0]
+    p = peers[0] if peers else {}
+    extra = sorted(set(iface) - WG_IFACE_KEYS) + sorted(set(p) - WG_PEER_KEYS)
+    if len(peers) > 1:
+        extra.append("további [Peer] szakaszok")
+    out = {"private_key": first(iface, "privatekey"), "address": j(iface, "address"),
+           "dns": j(iface, "dns"), "mtu": first(iface, "mtu"),
+           "server_pub": first(p, "publickey"), "psk": first(p, "presharedkey"),
+           "endpoint": first(p, "endpoint"), "allowed": j(p, "allowedips"),
+           "keepalive": first(p, "persistentkeepalive")}
+    out["simple"] = len(peers) == 1 and not extra
+    return out, extra
+
+
+def wg_endpoint_ok(e):
+    m = re.fullmatch(r"\[([0-9A-Fa-f:.]+)\]:([0-9]{1,5})", e)
+    if m:
+        host, port = m.groups()
+        try:
+            ipaddress.IPv6Address(host)
+        except ValueError:
+            return False
+    else:
+        if e.count(":") != 1:
+            return False
+        host, port = e.split(":")
+        if not HOST_RE.fullmatch(host) or not re.fullmatch(r"[0-9]{1,5}", port):
+            return False
+    return 1 <= int(port) <= 65535
+
+
+def wg_validate(f, need_priv=True):
+    """Az űrlap ellenőrzése és normalizálása. Hibánál RuntimeError (magyar üzenettel)."""
+    o = {}
+    pk = (f.get("private_key") or "").strip()
+    if (pk or need_priv) and not wg_key_ok(pk):
+        raise RuntimeError("Érvénytelen kliens privát kulcs (44 karakteres base64 kulcs kell).")
+    o["private_key"] = pk
+    sp = (f.get("server_pub") or "").strip()
+    if not wg_key_ok(sp):
+        raise RuntimeError("Érvénytelen szerver nyilvános kulcs.")
+    o["server_pub"] = sp
+    psk = (f.get("psk") or "").strip()
+    if psk and not wg_key_ok(psk):
+        raise RuntimeError("Érvénytelen előmegosztott kulcs.")
+    o["psk"] = psk
+    try:
+        o["address"] = [str(ipaddress.ip_interface(a)) for a in wg_split(f.get("address"))]
+    except ValueError:
+        raise RuntimeError("Érvénytelen kliens cím (pl. 10.8.0.2/32).") from None
+    if not o["address"]:
+        raise RuntimeError("Add meg a kliens címét (pl. 10.8.0.2/32).")
+    try:
+        o["allowed"] = [str(ipaddress.ip_network(a, strict=False)) for a in wg_split(f.get("allowed"))]
+    except ValueError:
+        raise RuntimeError("Érvénytelen az engedélyezett IP-k listája (pl. 10.8.0.0/24 vagy 0.0.0.0/0, ::/0).") from None
+    if not o["allowed"]:
+        raise RuntimeError("Add meg az engedélyezett IP-ket (pl. 10.8.0.0/24).")
+    dns = []
+    for d in wg_split(f.get("dns")):
+        try:
+            dns.append(str(ipaddress.ip_address(d)))
+        except ValueError:
+            if not HOST_RE.fullmatch(d):
+                raise RuntimeError(f"Érvénytelen DNS-bejegyzés: {d}") from None
+            dns.append(d)
+    o["dns"] = dns
+    ep = (f.get("endpoint") or "").strip()
+    if not wg_endpoint_ok(ep):
+        raise RuntimeError("Érvénytelen szerver-végpont (host:port, pl. vpn.example.hu:51820).")
+    o["endpoint"] = ep
+    mtu = str(f.get("mtu") or "").strip()
+    if mtu and not (re.fullmatch(r"[0-9]{3,4}", mtu) and 576 <= int(mtu) <= 9000):
+        raise RuntimeError("Érvénytelen MTU (576–9000).")
+    o["mtu"] = mtu
+    ka = str(f.get("keepalive") or "").strip()
+    if ka and not (re.fullmatch(r"[0-9]{1,5}", ka) and int(ka) <= 65535):
+        raise RuntimeError("Érvénytelen keepalive érték.")
+    o["keepalive"] = "" if ka in ("", "0") else ka
+    return o
+
+
+def wg_render_conf(o):
+    lines = ["# Ciszterci Admin – WireGuard profil", "[Interface]",
+             f"PrivateKey = {o['private_key']}", f"Address = {', '.join(o['address'])}"]
+    if o["dns"]:
+        lines.append(f"DNS = {', '.join(o['dns'])}")
+    if o["mtu"]:
+        lines.append(f"MTU = {o['mtu']}")
+    lines += ["", "[Peer]", f"PublicKey = {o['server_pub']}"]
+    if o["psk"]:
+        lines.append(f"PresharedKey = {o['psk']}")
+    lines.append(f"Endpoint = {o['endpoint']}")
+    lines.append(f"AllowedIPs = {', '.join(o['allowed'])}")
+    if o["keepalive"]:
+        lines.append(f"PersistentKeepalive = {o['keepalive']}")
+    return "\n".join(lines) + "\n"
+
+
+def put_secret(path, data):
+    """Titkos fájl írása: a tartalom sosem kerül világ által olvasható fájlba."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    try:
+        os.remove(tmp)
+    except FileNotFoundError:
+        pass
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(data)
+    os.replace(tmp, path)
+
+
+def wg_read_profile(path):
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        iface, peers = wg_parse_text(fh.read(1 << 20))
+    out, extra = wg_fields(iface, peers)
+    out["extra"] = extra
+    return out
+
+
+def wg_autostart_on(name):
+    try:
+        return subprocess.run(["systemctl", "is-enabled", "--quiet", f"wg-quick@{name}"]).returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+def wg_collect():
+    """A profilok listája a GUI-nak. Privát kulcs és PSK soha nem hagyja el a segédet."""
+    out = []
+    try:
+        names = sorted(fn[:-5] for fn in os.listdir(WG_DIR) if fn.endswith(".conf"))
+    except OSError:
+        return out
+    for n in names:
+        if not WG_NAME_RE.fullmatch(n):
+            continue
+        try:
+            info = wg_read_profile(f"{WG_DIR}/{n}.conf")
+        except OSError:
+            continue
+        priv, psk = info.pop("private_key", ""), info.pop("psk", "")
+        info.update(name=n, has_psk=bool(psk), client_pub=wg_pubkey(priv), autostart=wg_autostart_on(n))
+        out.append(info)
+    return out
+
+
+def wg_need_tools():
+    if not (have("wg") and have("wg-quick")):
+        raise RuntimeError("A WireGuard eszközök nincsenek telepítve (wireguard-tools).")
+
+
+def wg_profile(r, must_exist=True):
+    name = r.get("name", "")
+    if not WG_NAME_RE.fullmatch(name):
+        raise RuntimeError("Érvénytelen profilnév (1–15 karakter: betű, szám, _ = + . -).")
+    path = f"{WG_DIR}/{name}.conf"
+    if must_exist and not os.path.isfile(path):
+        raise RuntimeError(f"Nincs ilyen profil: {name}")
+    return name, path
+
+
+def op_wg_list(r):
+    return "A lista frissítve.", wg_collect()
+
+
+def op_wg_save(r):
+    wg_need_tools()
+    name, path = wg_profile(r, must_exist=False)
+    form = dict(r)
+    if r.get("edit"):
+        name, path = wg_profile(r)
+        old = wg_read_profile(path)
+        if not old["simple"]:
+            raise RuntimeError("Összetett profil (több peer vagy egyéb beállítás), itt nem szerkeszthető.")
+        if wg_active(name):
+            raise RuntimeError("Szerkesztés előtt kapcsold ki a VPN-t.")
+        if not (r.get("private_key") or "").strip():
+            form["private_key"] = old["private_key"]
+        if not (r.get("psk") or "").strip():
+            form["psk"] = "" if r.get("psk_clear") else old["psk"]
+    else:
+        if os.path.exists(path):
+            raise RuntimeError(f"Már van ilyen nevű profil: {name}")
+        if os.path.exists(f"/sys/class/net/{name}"):
+            raise RuntimeError(f"Ilyen nevű hálózati eszköz már létezik: {name}")
+    o = wg_validate(form)
+    os.makedirs(WG_DIR, exist_ok=True)
+    os.chmod(WG_DIR, 0o700)
+    put_secret(path, wg_render_conf(o))
+    hlog(f"Profil mentve: {path}")
+    return f"Profil mentve: {name}", wg_collect()
+
+
+def op_wg_up(r):
+    wg_need_tools()
+    name, path = wg_profile(r)
+    if wg_active(name):
+        return "Már csatlakozva.", wg_collect()
+    if wg_read_profile(path)["dns"] and not have("resolvconf"):
+        # A wg-quick a DNS beállításához resolvconfot használ: első használatkor pótoljuk.
+        hlog("A profil DNS-t állít be, de a resolvconf hiányzik: az openresolv telepítése…")
+        hrun(["apt-get", "update"], check=False)
+        hrun(["apt-get", "install", "-y", "openresolv"])
+        if not have("resolvconf"):
+            raise RuntimeError("Az openresolv telepítése után sem található a resolvconf.")
+    hrun(["wg-quick", "up", name])
+    return f"A VPN csatlakozott: {name}", wg_collect()
+
+
+def op_wg_down(r):
+    wg_need_tools()
+    name, _path = wg_profile(r)
+    if not wg_active(name):
+        return "Már le van kapcsolva.", wg_collect()
+    hrun(["wg-quick", "down", name])
+    return f"A VPN lekapcsolva: {name}", wg_collect()
+
+
+def op_wg_delete(r):
+    name, path = wg_profile(r)
+    if wg_active(name):
+        hrun(["wg-quick", "down", name], check=False)
+    hrun(["systemctl", "disable", f"wg-quick@{name}"], check=False)
+    os.remove(path)
+    return f"Profil törölve: {name}", wg_collect()
+
+
+def op_wg_autostart(r):
+    name, _path = wg_profile(r)
+    if r.get("action") not in ("enable", "disable"):
+        raise RuntimeError("Ismeretlen művelet.")
+    hrun(["systemctl", r["action"], f"wg-quick@{name}"])
+    return ("Indítás rendszerindításkor: bekapcsolva." if r["action"] == "enable"
+            else "Indítás rendszerindításkor: kikapcsolva."), wg_collect()
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
-       "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time}
+       "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
+       "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
+       "wg_delete": op_wg_delete, "wg_autostart": op_wg_autostart}
 
 
 def helper_main():
     for line in sys.stdin:
         try:
             req = json.loads(line)
-            emit({"rc": 0, "msg": OPS[req["op"]](req) or "Kész."})
+            res = OPS[req["op"]](req)
+            if isinstance(res, tuple):          # (üzenet, adat): az adat a GUI-nak szól (pl. WireGuard lista)
+                emit({"rc": 0, "msg": res[0] or "Kész.", "data": res[1]})
+            else:
+                emit({"rc": 0, "msg": res or "Kész."})
         except Exception as e:  # noqa: BLE001
             emit({"rc": 1, "msg": str(e)})
 
@@ -495,6 +811,7 @@ def helper_main():
 class Helper:
     def __init__(self):
         self.p = None
+        self.data = None
 
     def _start(self):
         if self.p is None or self.p.poll() is not None:
@@ -502,6 +819,7 @@ class Helper:
                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf-8")
 
     def call(self, req, on_log=None):
+        self.data = None
         try:
             self._start()
             self.p.stdin.write(json.dumps(req) + "\n")
@@ -515,6 +833,7 @@ class Helper:
                     if on_log:
                         on_log(r["log"])
                     continue
+                self.data = r.get("data")
                 return r["rc"], r["msg"]
         except (BrokenPipeError, OSError, ValueError) as e:
             return 126, f"A segédfolyamat nem érhető el: {e}"
@@ -585,6 +904,7 @@ def gui_main(helper=None, run=True):
             self.busy = False
             self.pkgrows = []
             self.bg_path = None
+            self.wg_profiles, self.wg_loaded, self.wg_editing = [], False, None
 
             outer = Gtk.Box(orientation=V)
             self.add(outer)
@@ -596,8 +916,9 @@ def gui_main(helper=None, run=True):
             self.stack.set_transition_type(Gtk.StackTransitionType.NONE)
             pages = [("Bejelentkező ablak", self.page_login), ("Távoli segítség", self.page_remote),
                      ("Felhő tárhely", self.page_cloud), ("Tartományba léptetés", self.page_domain),
-                     ("Rendszeridő", self.page_time), ("Rendszer", self.page_system)]
+                     ("WireGuard VPN", self.page_wg), ("Rendszeridő", self.page_time), ("Rendszer", self.page_system)]
             self.page_names = []
+            self.wg_idx = [t for t, _b in pages].index("WireGuard VPN")
             for i, (title, builder) in enumerate(pages):
                 row = Gtk.ListBoxRow()
                 lab = Gtk.Label(label=title, xalign=0)
@@ -639,6 +960,8 @@ def gui_main(helper=None, run=True):
         def on_row(self, _lb, row):
             if row is not None:
                 self.stack.set_visible_child_name(self.page_names[row.get_index()])
+                if row.get_index() == self.wg_idx and not self.wg_loaded and pkg_ok("wireguard-tools"):
+                    self.wg_refresh()
 
         def mk_page(self, title, sub=""):
             box = Gtk.Box(orientation=V, spacing=8)
@@ -686,9 +1009,9 @@ def gui_main(helper=None, run=True):
             d.destroy()
             return ok
 
-        def run_task(self, steps):
+        def run_task(self, steps, cb=None):
             if self.busy:
-                return
+                return False
             self.busy = True
             self.stack.set_sensitive(False)
             self.progress.show()
@@ -696,20 +1019,22 @@ def gui_main(helper=None, run=True):
             GLib.timeout_add(120, self.pulse)
 
             def worker():
-                rc, msg = 0, ""
+                rc, msg, data = 0, "", None
                 for op, params in steps:
                     rc, msg = self.h.call(dict(params, op=op), on_log=lambda m: GLib.idle_add(self.log, m))
+                    data = self.h.data
                     if rc != 0:
                         break
-                GLib.idle_add(self.task_done, rc, msg)
+                GLib.idle_add(self.task_done, rc, msg, cb, data)
             threading.Thread(target=worker, daemon=True).start()
+            return True
 
         def pulse(self):
             if self.busy:
                 self.progress.pulse()
             return self.busy
 
-        def task_done(self, rc, msg):
+        def task_done(self, rc, msg, cb=None, data=None):
             self.busy = False
             self.progress.hide()
             self.stack.set_sensitive(True)
@@ -717,6 +1042,8 @@ def gui_main(helper=None, run=True):
             if rc != 0:
                 self.expander.set_expanded(True)
             self.say(rc, msg)
+            if cb:
+                cb(rc, msg, data)
             self.refresh_status()
             return False
 
@@ -799,6 +1126,13 @@ def gui_main(helper=None, run=True):
                 br.set_sensitive(ok)
             if hasattr(self, "chrony_lbl"):
                 self.chrony_lbl.set_text(self.chrony_state())
+            if hasattr(self, "wg_ctrls"):
+                ok = pkg_ok("wireguard-tools")
+                for w in self.wg_ctrls:
+                    w.set_sensitive(ok)
+                self.wg_hint.set_text("" if ok else "⚠ A WireGuard eszközök nincsenek telepítve: előbb telepítsd őket fent.")
+                if ok and not self.wg_loaded and self.stack.get_visible_child_name() == self.page_names[self.wg_idx]:
+                    self.wg_refresh()
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
@@ -1044,6 +1378,280 @@ def gui_main(helper=None, run=True):
             dt = f"{y:04d}-{m + 1:02d}-{d:02d} {h:02d}:{mi:02d}:{s:02d}"
             if self.confirm(f"A rendszeridő beállítása: {dt}\nA chrony leáll. Folytatod?"):
                 self.run_task([("time", {"datetime": dt})])
+
+        # -------------------------------------------------------------- WireGuard VPN
+        def page_wg(self):
+            b = self.mk_page("WireGuard VPN",
+                             "Meglévő kliens-kulcsok (profilok) importálása és kezelése; a VPN profilonként "
+                             "kapcsolható ki/be. A lista megnyitásakor hitelesítést kér a rendszer.")
+            self.pkg_row(b, "WireGuard eszközök", "A wireguard-tools csomag (wg, wg-quick) a Debian-tárolóból.",
+                         "wireguard-tools", [("pkg", {"action": "install", "pkgs": ["wireguard-tools"]})],
+                         [("pkg", {"action": "remove", "pkgs": ["wireguard-tools"]})])
+            self.head(b, "Kapcsolatok")
+            bar = Gtk.Box(spacing=8)
+            self.wg_ctrls = [self.btn("Új profil…", self.wg_new),
+                             self.btn("Importálás .conf fájlból…", self.wg_import),
+                             self.btn("Lista frissítése", self.wg_refresh)]
+            for w in self.wg_ctrls:
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.wg_hint = self.lab("")
+            b.pack_start(self.wg_hint, False, False, 0)
+            self.wg_box = Gtk.Box(orientation=V, spacing=4)
+            b.pack_start(self.wg_box, False, False, 4)
+            self.wg_render()
+
+            # --- űrlap (új / szerkesztés)
+            self.wg_exp = Gtk.Expander(label="Profil")
+            g = Gtk.Grid(column_spacing=10, row_spacing=6)
+            g.set_margin_start(12)
+            g.set_margin_top(6)
+            self.wg_e, self.wg_ph = {}, {}
+
+            def entry(key, label, row, width=44, ph=""):
+                g.attach(Gtk.Label(label=label, xalign=1), 0, row, 1, 1)
+                e = Gtk.Entry()
+                e.set_width_chars(width)
+                e.set_placeholder_text(ph)
+                g.attach(e, 1, row, 1, 1)
+                self.wg_e[key], self.wg_ph[key] = e, ph
+                return e
+            entry("name", "Profil neve:", 0, 18, "pl. iskola (max. 15 karakter)")
+            pk = entry("private_key", "Kliens privát kulcs:", 1)
+            pk.set_visibility(False)
+            pk.connect("changed", self.wg_on_priv_changed)
+            kb = Gtk.Box(spacing=6)
+            kb.pack_start(self.btn("Új kulcs generálása", self.wg_gen), False, False, 0)
+            self.wg_c_show = Gtk.CheckButton(label="Mutat")
+            self.wg_c_show.connect("toggled", lambda c: pk.set_visibility(c.get_active()))
+            kb.pack_start(self.wg_c_show, False, False, 0)
+            g.attach(kb, 2, 1, 1, 1)
+            g.attach(Gtk.Label(label="Kliens nyilvános kulcs:", xalign=1), 0, 2, 1, 1)
+            self.wg_pub = Gtk.Label(xalign=0)
+            self.wg_pub.set_selectable(True)
+            g.attach(self.wg_pub, 1, 2, 2, 1)
+            entry("address", "Kliens cím:", 3, 44, "pl. 10.8.0.2/32")
+            entry("dns", "DNS (nem kötelező):", 4, 44, "pl. 10.8.0.1")
+            entry("server_pub", "Szerver nyilvános kulcsa:", 5)
+            entry("psk", "Előmegosztott kulcs (nem kötelező):", 6)
+            self.wg_c_pskclear = Gtk.CheckButton(label="Meglévő törlése")
+            g.attach(self.wg_c_pskclear, 2, 6, 1, 1)
+            entry("endpoint", "Szerver végpontja:", 7, 44, "pl. vpn.example.hu:51820")
+            entry("allowed", "Engedélyezett IP-k:", 8, 44, "pl. 10.8.0.0/24")
+            g.attach(self.btn("Teljes forgalom",
+                              lambda *_: self.wg_e["allowed"].set_text("0.0.0.0/0, ::/0")), 2, 8, 1, 1)
+            g.attach(Gtk.Label(label="Keepalive (mp, 0 = ki):", xalign=1), 0, 9, 1, 1)
+            self.wg_sp = Gtk.SpinButton.new_with_range(0, 3600, 1)
+            self.wg_sp.set_value(25)
+            kk = Gtk.Box()
+            kk.pack_start(self.wg_sp, False, False, 0)
+            g.attach(kk, 1, 9, 1, 1)
+            entry("mtu", "MTU (nem kötelező):", 10, 8)
+            hb = Gtk.Box(spacing=8)
+            hb.pack_start(self.btn("Mentés", self.wg_save), False, False, 0)
+            hb.pack_start(self.btn("Mégse", self.wg_cancel), False, False, 0)
+            g.attach(hb, 1, 11, 1, 1)
+            self.wg_exp.add(g)
+            b.pack_start(self.wg_exp, False, False, 6)
+            return b
+
+        # --- lista
+        def wg_render(self):
+            for c in self.wg_box.get_children():
+                self.wg_box.remove(c)
+            if not self.wg_profiles:
+                self.wg_box.pack_start(self.lab("(Nincs betöltött profil.)"), False, False, 0)
+            for p in self.wg_profiles:
+                self.wg_box.pack_start(self.wg_row(p), False, False, 0)
+            self.wg_box.show_all()
+
+        def wg_row(self, p):
+            name = p["name"]
+            act = wg_active(name)
+            box = Gtk.Box(orientation=V, spacing=2)
+            row = Gtk.Box(spacing=10)
+            left = Gtk.Box(orientation=V, spacing=2)
+            t = Gtk.Label(xalign=0)
+            state = ('<span foreground="#15803d">● csatlakozva</span>' if act
+                     else '<span foreground="#6b7280">○ lekapcsolva</span>')
+            t.set_markup(f"<b>{GLib.markup_escape_text(name)}</b>   {state}")
+            left.pack_start(t, False, False, 0)
+            left.pack_start(self.lab(f"Végpont: {p.get('endpoint') or '–'}    Cím: {p.get('address') or '–'}"),
+                            False, False, 0)
+            pub = self.lab("Kliens nyilvános kulcs: " + (p.get("client_pub") or "–"))
+            pub.set_selectable(True)
+            left.pack_start(pub, False, False, 0)
+            if not p.get("simple"):
+                extra = ", ".join(p.get("extra") or []) or "több peer"
+                left.pack_start(self.lab(f"Összetett profil ({extra}): csak ki/be kapcsolható és törölhető."),
+                                False, False, 0)
+            sw = Gtk.Switch()
+            sw.set_active(act)
+            sw.set_valign(Gtk.Align.CENTER)
+            sw.connect("state-set", self.on_wg_switch, name)
+            ca = Gtk.CheckButton(label="Indul rendszerindításkor")
+            ca.set_active(bool(p.get("autostart")))
+            ca.connect("toggled", self.on_wg_auto, name)
+            be = self.btn("Szerkesztés", lambda *_: self.wg_edit(p))
+            be.set_sensitive(bool(p.get("simple")))
+            bd = self.btn("Törlés", lambda *_: self.wg_delete(name))
+            row.pack_start(left, True, True, 0)
+            for w in (sw, ca, be, bd):
+                row.pack_start(w, False, False, 0)
+            box.pack_start(row, False, False, 4)
+            box.pack_start(Gtk.Separator(), False, False, 2)
+            return box
+
+        def on_wg_switch(self, sw, state, name):
+            if not self.busy:
+                self.run_task([("wg_up" if state else "wg_down", {"name": name})], self.wg_done)
+            return True        # a kapcsoló állapotát a művelet után a lista újrarajzolása állítja be
+
+        def on_wg_auto(self, cb, name):
+            if not self.busy:
+                self.run_task([("wg_autostart", {"name": name,
+                                                 "action": "enable" if cb.get_active() else "disable"})],
+                              self.wg_done)
+
+        def wg_delete(self, name):
+            if self.confirm(f"Törlöd a(z) {name} profilt? A kliens kulcs is törlődik erről a gépről."):
+                self.run_task([("wg_delete", {"name": name})], self.wg_done)
+
+        def wg_refresh(self, *_):
+            if self.run_task([("wg_list", {})], self.wg_done):
+                self.wg_loaded = True
+                return True
+            return False
+
+        def wg_done(self, rc, msg, data):
+            if data is not None:
+                self.wg_profiles = data
+            self.wg_render()
+
+        # --- űrlap
+        def wg_clear_form(self):
+            for k, e in self.wg_e.items():
+                e.set_text("")
+                e.set_placeholder_text(self.wg_ph[k])
+                e.set_sensitive(True)
+            self.wg_sp.set_value(25)
+            self.wg_c_pskclear.set_active(False)
+            self.wg_pub.set_text("")
+
+        def wg_new(self, *_):
+            self.wg_editing = None
+            self.wg_clear_form()
+            self.wg_exp.set_label("Új profil")
+            self.wg_exp.set_expanded(True)
+            self.wg_e["name"].grab_focus()
+
+        def wg_edit(self, p):
+            if wg_active(p["name"]):
+                self.say(1, "Szerkesztés előtt kapcsold ki a VPN-t.")
+                return
+            self.wg_clear_form()
+            self.wg_editing = p["name"]
+            e = self.wg_e
+            e["name"].set_text(p["name"])
+            e["name"].set_sensitive(False)
+            e["private_key"].set_placeholder_text("(változatlan marad, ha üresen hagyod)")
+            if p.get("has_psk"):
+                e["psk"].set_placeholder_text("(változatlan marad, ha üresen hagyod)")
+            for k in ("address", "dns", "server_pub", "endpoint", "allowed", "mtu"):
+                e[k].set_text(p.get(k) or "")
+            ka = p.get("keepalive") or "0"
+            self.wg_sp.set_value(int(ka) if ka.isdigit() else 0)
+            self.wg_pub.set_text(p.get("client_pub") or "")
+            self.wg_exp.set_label(f"Profil szerkesztése: {p['name']}")
+            self.wg_exp.set_expanded(True)
+
+        def wg_on_priv_changed(self, entry):
+            t = entry.get_text().strip()
+            if not t:
+                self.wg_pub.set_text("")
+            else:
+                self.wg_pub.set_text(wg_pubkey(t) or "(érvénytelen kulcs, vagy hiányzik a wireguard-tools)")
+
+        def wg_gen(self, *_):
+            if not have("wg"):
+                self.say(1, "Előbb telepítsd a WireGuard eszközöket.")
+                return
+            e = self.wg_e["private_key"]
+            if e.get_text().strip() and not self.confirm("A mezőben már van kulcs. Felülírod egy újonnan generálttal?"):
+                return
+            r = subprocess.run(["wg", "genkey"], capture_output=True, text=True)
+            if r.returncode == 0:
+                e.set_text(r.stdout.strip())
+                self.say(0, "Új kulcs generálva. A nyilvános kulcsot add meg a szerver adminisztrátorának.")
+
+        def wg_import(self, *_):
+            d = Gtk.FileChooserDialog(title="WireGuard .conf fájl kiválasztása", transient_for=self,
+                                      action=Gtk.FileChooserAction.OPEN)
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Megnyitás", Gtk.ResponseType.OK)
+            f1 = Gtk.FileFilter()
+            f1.set_name("WireGuard (*.conf)")
+            f1.add_pattern("*.conf")
+            d.add_filter(f1)
+            f2 = Gtk.FileFilter()
+            f2.set_name("Minden fájl")
+            f2.add_pattern("*")
+            d.add_filter(f2)
+            path = d.get_filename() if d.run() == Gtk.ResponseType.OK else None
+            d.destroy()
+            if not path:
+                return
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    iface, peers = wg_parse_text(fh.read(65536))
+            except OSError as ex:
+                self.say(1, f"A fájl nem olvasható: {ex}")
+                return
+            if not peers or "privatekey" not in iface:
+                self.say(1, "Ez nem tűnik érvényes WireGuard konfigurációnak (hiányzik a PrivateKey vagy a [Peer]).")
+                return
+            fl, extra = wg_fields(iface, peers)
+            self.wg_new()
+            stem = re.sub(r"[^A-Za-z0-9_=+.-]", "", os.path.splitext(os.path.basename(path))[0])[:15] or "vpn"
+            e = self.wg_e
+            e["name"].set_text(stem)
+            for k in ("private_key", "address", "dns", "server_pub", "psk", "endpoint", "allowed", "mtu"):
+                e[k].set_text(fl[k])
+            ka = fl["keepalive"]
+            self.wg_sp.set_value(int(ka) if ka.isdigit() else 0)
+            msg = "Beolvasva. Ellenőrizd az adatokat, majd Mentés."
+            if extra:
+                msg += " Biztonsági okból nem importált beállítások: " + ", ".join(extra) + "."
+            self.say(0, msg)
+
+        def wg_form_values(self):
+            e = self.wg_e
+            v = {k: e[k].get_text().strip() for k in
+                 ("name", "private_key", "address", "dns", "server_pub", "psk", "endpoint", "allowed", "mtu")}
+            v["keepalive"] = str(int(self.wg_sp.get_value()))
+            v["psk_clear"] = self.wg_c_pskclear.get_active()
+            return v
+
+        def wg_save(self, *_):
+            v = self.wg_form_values()
+            edit = self.wg_editing is not None
+            try:
+                if not WG_NAME_RE.fullmatch(v["name"]):
+                    raise RuntimeError("A profilnév 1–15 karakter lehet: betű, szám, _ = + . -")
+                wg_validate(v, need_priv=not edit)
+            except RuntimeError as ex:
+                self.say(1, str(ex))
+                return
+            self.run_task([("wg_save", dict(v, edit=edit))], self.wg_saved)
+
+        def wg_saved(self, rc, msg, data):
+            self.wg_done(rc, msg, data)
+            if rc == 0:
+                self.wg_cancel()
+
+        def wg_cancel(self, *_):
+            self.wg_editing = None
+            self.wg_clear_form()
+            self.wg_exp.set_expanded(False)
 
         # --------------------------------------------------------------- Rendszer
         def page_system(self):
