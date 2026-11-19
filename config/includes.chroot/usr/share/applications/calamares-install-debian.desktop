@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Ciszterci Linux Install
+GenericName=Ciszterci Installer
+Exec=calamares-install-debian
+Comment=Calamares — Installer for Debian Live
+Keywords=calamares;system;install;debian;installer
+Icon=/usr/share/ciszterci/logo.png
+Terminal=false
+Categories=Qt;System;
+StartupWMClass=calamares
+StartupNotify=True
