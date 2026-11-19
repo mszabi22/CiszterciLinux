@@ -41,7 +41,7 @@ ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
 # Gyakori portok -> a megjegyzés rovatba kerülő rövid név
 SERVICES = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 67: "dhcp-szerver", 68: "dhcp",
-    69: "tftp", 80: "web", 110: "pop3", 123: "ntp", 137: "netbios", 138: "netbios", 139: "netbios", 143: "imap", 389: "ldap",
+    69: "tftp", 80: "http", 110: "pop3", 123: "ntp", 137: "netbios", 138: "netbios", 139: "netbios", 143: "imap", 389: "ldap",
     443: "https", 445: "samba", 465: "smtps", 514: "syslog", 548: "afp", 587: "smtp", 631: "nyomtatás",
     636: "ldaps", 873: "rsync", 993: "imaps", 995: "pop3s", 1194: "openvpn", 1883: "mqtt",
     1900: "upnp", 2049: "nfs", 3306: "mysql", 3389: "rdp", 5060: "sip", 5353: "mdns",
