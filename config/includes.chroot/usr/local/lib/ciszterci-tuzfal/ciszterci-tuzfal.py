@@ -48,7 +48,7 @@ SERVICES = {
     5432: "postgres", 5900: "vnc", 6379: "redis", 8006: "proxmox", 8008: "matrix",
     8080: "web (alt)", 8096: "jellyfin", 8443: "https (alt)", 8448: "matrix (fed)",
     9090: "cockpit", 9100: "nyomtató", 11100: "veyon", 11400: "veyon-demo",
-    25565: "minecraft", 32400: "plex", 51820: "wireguard",
+    25565: "minecraft", 32400: "plex", 51820: "wireguard", 53317: "localsend",
 }
 
 
@@ -687,6 +687,7 @@ def gui_main():
                 ("Veyon szolgáltatás engedése (11100)", False),
                 ("Veyon bemutató mód engedése (11400, tanári gép)", False),
                 ("Webszerver engedése (80, 443)", False),
+                ("LocalSend engedése (53317 tcp+udp)", False),
                 ("Samba fájlmegosztás engedése (445, 139, 137-138/udp)", False),
                 ("Samba tartományi kliens (NetBIOS-válaszok, 137/udp)", False),
                 ("Samba csak ebből a hálózatból (pl. 10.0.0.0/24; üres = mindenhonnan)", ""),
@@ -695,18 +696,21 @@ def gui_main():
             if not v:
                 return
             net = ""
-            if v[6]:
-                if not self.ok_net(v[6]):
+            if v[7]:
+                if not self.ok_net(v[7]):
                     self.say(1, "Hibás hálózat (pl. 10.0.0.0/24).")
                     return
-                net = str(ipaddress.IPv4Network(v[6], strict=False))
-            extra_tcp, udp = parse_ports(v[7]), parse_ports(v[8])
+                net = str(ipaddress.IPv4Network(v[7], strict=False))
+            extra_tcp, udp = parse_ports(v[8]), parse_ports(v[9])
             if extra_tcp is None or udp is None:
                 self.say(1, "Hibás portlista (pl.: 80,443,8000:8010).")
                 return
+            if v[4] == "1" and "53317" not in udp:
+                udp.append("53317")      # LocalSend felfedezés (multicast) UDP-n megy
             tcp = []
             for on, ports in ((v[1] == "1", ["11100"]), (v[2] == "1", ["11400"]),
-                              (v[3] == "1", ["80", "443"]), (True, extra_tcp)):
+                              (v[3] == "1", ["80", "443"]), (v[4] == "1", ["53317"]),
+                              (True, extra_tcp)):
                 for pt in (ports if on else []):
                     if pt not in tcp:
                         tcp.append(pt)
@@ -718,7 +722,7 @@ def gui_main():
                 return
             for ver in ("v4", "v6"):
                 text = desktop_template(ver == "v6", v[0] == "1", tcp, udp,
-                                        samba=v[4] == "1", dom=v[5] == "1", net=net)
+                                        samba=v[5] == "1", dom=v[6] == "1", net=net)
                 rc, _, err = self.h.restore(ver, text)
                 if rc != 0:
                     self.refresh()
