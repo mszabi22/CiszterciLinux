@@ -40,7 +40,7 @@ DESKTOP_FILE = (
     "Name=Ciszterci Vezérlőpult\nGenericName=Vezérlőpult\n"
     "Comment=Ciszterci Vezérlőpult – bejelentkező ablak, távoli segítség, tartomány, idő, rendszer\n"
     "Exec=/usr/local/bin/ciszterci-admin\nIcon=ciszterci-admin\nTerminal=false\n"
-    "Categories=System;\nKeywords=admin;vezérlőpult;beállítások;bejelentkezés;tartomány;idő;\n")
+    "Categories=System;\nKeywords=admin;vezérlőpult;beállítások;bejelentkezés;tartomány;idő;megosztás;samba;\n")
 
 ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
 <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
@@ -465,7 +465,7 @@ def op_login(r):
     return "Mentve. A változás a következő bejelentkező képernyőnél lép életbe (kijelentkezés után)."
 
 
-PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools"}
+PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba"}
 
 
 def op_pkg(r):
@@ -1175,10 +1175,363 @@ def op_wg_autostart(r):
             else "Indítás rendszerindításkor: kikapcsolva."), wg_collect()
 
 
+# ------------------------------------------------------- Mappamegosztás (Samba / SMB)
+# A megosztásokat egy saját fájl (SHARE_CONF) tartalmazza, amit az smb.conf végéről húzunk be (include),
+# így az smb.conf többi része érintetlen marad. A root segéd minden mezőt ellenőriz, mentés előtt
+# testparm-mal kipróbálja a konfigurációt, hibánál visszaállítja az előzőt.
+SMB_CONF = "/etc/samba/smb.conf"
+SHARE_CONF = "/etc/samba/ciszterci-shares.conf"
+SHARE_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
+SHARE_RESERVED = {"global", "homes", "printers", "print$", "ipc$"}
+SHARE_ROOTS = ("/home", "/srv", "/mnt", "/media", "/opt", "/data", "/shares")
+SHARE_MODES = ("users", "guest_ro", "guest_rw")
+UNIX_NAME_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}")
+SHARE_BAD_CHARS = re.compile(r"[\x00-\x1f\x7f%]")
+
+
+def share_path_ok(rp):
+    """Csak a megengedett gyökerek alatti mappa osztható meg (maga a gyökér nem)."""
+    return any(rp.startswith(r + "/") for r in SHARE_ROOTS)
+
+
+def share_need():
+    if not (have("smbd") and have("smbpasswd")):
+        raise RuntimeError("A Samba nincs telepítve (samba csomag).")
+
+
+def share_unix_user(name):
+    """Rendes (nem rendszer-) felhasználó: uid 1000–59999."""
+    if not isinstance(name, str) or not UNIX_NAME_RE.fullmatch(name):
+        raise RuntimeError(f"Érvénytelen felhasználónév: {name}")
+    try:
+        u = pwd.getpwnam(name)
+    except KeyError:
+        raise RuntimeError(f"Nincs ilyen felhasználó: {name}")
+    if not 1000 <= u.pw_uid < 60000:
+        raise RuntimeError(f"Rendszerfelhasználó nem használható: {name}")
+    return u
+
+
+def share_principal(p):
+    """Felhasználó vagy @csoport ellenőrzése a hozzáférési listához."""
+    if isinstance(p, str) and p.startswith("@"):
+        g = p[1:]
+        if not UNIX_NAME_RE.fullmatch(g):
+            raise RuntimeError(f"Érvénytelen csoportnév: {g}")
+        try:
+            gr = grp.getgrnam(g)
+        except KeyError:
+            raise RuntimeError(f"Nincs ilyen csoport: {g}")
+        if gr.gr_gid == 0:
+            raise RuntimeError("A root csoport nem használható.")
+        return p
+    share_unix_user(p)
+    return p
+
+
+def share_path(p):
+    if not isinstance(p, str) or not p.startswith("/") or len(p) > 1000 or SHARE_BAD_CHARS.search(p):
+        raise RuntimeError("Érvénytelen mappa-útvonal.")
+    rp = os.path.realpath(p)
+    if SHARE_BAD_CHARS.search(rp) or not os.path.isdir(rp):
+        raise RuntimeError(f"A mappa nem létezik vagy nem használható: {p}")
+    if not share_path_ok(rp):
+        raise RuntimeError("Biztonsági okból csak a /home, /srv, /mnt, /media, /opt, /data és /shares "
+                           "alatti mappa osztható meg (maga ez a könyvtár nem).")
+    return rp
+
+
+def share_main_names():
+    """Az smb.conf saját szakaszainak nevei (hogy ne ütközzünk velük)."""
+    try:
+        with open(SMB_CONF, encoding="utf-8", errors="replace") as f:
+            return {m.group(1).strip().lower() for m in re.finditer(r"^\s*\[([^\]]+)\]", f.read(), re.M)}
+    except OSError:
+        return set()
+
+
+def share_read():
+    """A kezelt megosztások beolvasása a SHARE_CONF-ból."""
+    raw, cur = [], None
+    try:
+        with open(SHARE_CONF, encoding="utf-8") as f:
+            for line in f:
+                t = line.strip()
+                if not t or t[0] in "#;":
+                    continue
+                m = re.fullmatch(r"\[([^\]]+)\]", t)
+                if m:
+                    cur = {"name": m.group(1), "kv": {}}
+                    raw.append(cur)
+                elif cur is not None and "=" in t:
+                    k, v = t.split("=", 1)
+                    cur["kv"][k.strip().lower()] = v.strip()
+    except OSError:
+        return []
+
+    def split(s):
+        return [x for x in re.split(r"[,\s]+", s or "") if x]
+    out = []
+    for c in raw:
+        kv = c["kv"]
+        guest = kv.get("guest ok", "no").lower() == "yes"
+        ro = kv.get("read only", "yes").lower() != "no"
+        wl = split(kv.get("write list"))
+        if guest and not ro:
+            mode, users = "guest_rw", []
+        elif guest:
+            mode, users = "guest_ro", [{"name": u, "rw": True} for u in wl]
+        else:
+            mode, users = "users", [{"name": u, "rw": u in wl} for u in split(kv.get("valid users"))]
+        out.append({"name": c["name"], "path": kv.get("path", ""), "comment": kv.get("comment", ""),
+                    "mode": mode, "users": users, "force_user": kv.get("force user", ""),
+                    "available": kv.get("available", "yes").lower() != "no"})
+    return out
+
+
+def share_render(shares):
+    lines = ["# Ciszterci Admin – kezelt megosztások. Kézzel ne szerkeszd: a program felülírja.", ""]
+    for s in shares:
+        lines.append(f"[{s['name']}]")
+        lines.append(f"   path = {s['path']}")
+        if s.get("comment"):
+            lines.append(f"   comment = {s['comment']}")
+        lines.append("   browseable = yes")
+        lines.append("   available = " + ("yes" if s.get("available", True) else "no"))
+        writers = [u["name"] for u in s["users"] if u["rw"]]
+        if s["mode"] == "guest_rw":
+            lines += ["   guest ok = yes", "   read only = no"]
+        elif s["mode"] == "guest_ro":
+            lines += ["   guest ok = yes", "   read only = yes"]
+            if writers:
+                lines.append("   write list = " + ", ".join(writers))
+        else:
+            lines += ["   guest ok = no", "   read only = yes",
+                      "   valid users = " + ", ".join(u["name"] for u in s["users"])]
+            if writers:
+                lines.append("   write list = " + ", ".join(writers))
+        if s.get("force_user"):
+            lines.append(f"   force user = {s['force_user']}")
+        lines += ["   create mask = 0664", "   directory mask = 0775", ""]
+    return "\n".join(lines)
+
+
+def share_ensure_include():
+    try:
+        with open(SMB_CONF, encoding="utf-8") as f:
+            txt = f.read()
+    except OSError:
+        raise RuntimeError(f"Nem található: {SMB_CONF}")
+    if not os.path.exists(SHARE_CONF):
+        put(SHARE_CONF, share_render([]), 0o644)
+    if re.search(rf"^\s*include\s*=\s*{re.escape(SHARE_CONF)}\s*$", txt, re.M):
+        return
+    if not os.path.exists(SMB_CONF + ".ciszterci-orig"):
+        shutil.copy2(SMB_CONF, SMB_CONF + ".ciszterci-orig")
+    with open(SMB_CONF, "a", encoding="utf-8") as f:
+        f.write(f"\n# Ciszterci Admin: kezelt megosztások\ninclude = {SHARE_CONF}\n")
+    hlog("Az smb.conf kiegészítve a kezelt megosztások fájljával.")
+
+
+def share_write(shares):
+    """Beírja a listát, kipróbálja testparm-mal, újratölti a Sambát; hibánál visszaállítja az előzőt."""
+    share_ensure_include()
+    try:
+        with open(SHARE_CONF, encoding="utf-8") as f:
+            old = f.read()
+    except OSError:
+        old = None
+    put(SHARE_CONF, share_render(shares), 0o644)
+    if have("testparm"):
+        r = subprocess.run(["testparm", "-s", SMB_CONF], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, env=dict(os.environ, LC_ALL="C.UTF-8"))
+        if r.returncode != 0:
+            if old is None:
+                os.remove(SHARE_CONF)
+            else:
+                put(SHARE_CONF, old, 0o644)
+            tail = " ".join((r.stderr or r.stdout).strip().splitlines()[-3:])
+            raise RuntimeError("A Samba nem fogadta el a beállítást, az előző állapot visszaállt. " + tail)
+    if svc_active("smbd"):
+        hrun(["smbcontrol", "smbd", "reload-config"], check=False)
+    else:
+        hrun(["systemctl", "enable", "--now", "smbd"], check=False)
+
+
+def share_guest_warn():
+    try:
+        r = subprocess.run(["testparm", "-s", "--parameter-name=map to guest", SMB_CONF],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    v = r.stdout.strip().lower()
+    if r.returncode == 0 and v and "bad user" not in v:
+        return (" Figyelem: az smb.conf-ban a 'map to guest' nem 'Bad User', ezért egyes (pl. Windows) "
+                "gépek nem fogják elérni a jelszó nélküli megosztást.")
+    return ""
+
+
+def share_collect():
+    """A GUI-nak szóló teljes állapot: megosztások, felhasználók, Samba-jelszavak, csatlakozott gépek."""
+    users = sorted(u.pw_name for u in pwd.getpwall() if 1000 <= u.pw_uid < 60000)
+    groups = sorted(g.gr_name for g in grp.getgrall() if 1000 <= g.gr_gid < 60000)
+    smb_users = []
+    if have("pdbedit"):
+        try:
+            r = subprocess.run(["pdbedit", "-L"], capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL, timeout=15)
+            if r.returncode == 0:
+                smb_users = sorted(l.split(":", 1)[0] for l in r.stdout.splitlines() if ":" in l)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    shares = share_read()
+    for s in shares:
+        try:
+            s["path_ok"] = os.path.isdir(s["path"])
+            s["owner"] = pwd.getpwuid(os.stat(s["path"]).st_uid).pw_name
+        except (OSError, KeyError):
+            s["path_ok"], s["owner"] = False, ""
+    sessions = ""
+    if have("smbstatus"):
+        try:
+            r = subprocess.run(["smbstatus", "-b"], capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL, timeout=15)
+            sessions = r.stdout.strip() if r.returncode == 0 else ""
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return {"shares": shares, "users": users, "groups": groups, "smb_users": smb_users,
+            "sessions": sessions, "running": svc_active("smbd")}
+
+
+def share_find(name):
+    if not isinstance(name, str) or not SHARE_NAME_RE.fullmatch(name):
+        raise RuntimeError("Érvénytelen megosztásnév.")
+    shares = share_read()
+    cur = next((s for s in shares if s["name"].lower() == name.lower()), None)
+    if cur is None:
+        raise RuntimeError(f"Nincs ilyen megosztás: {name}")
+    return shares, cur
+
+
+def op_share_setup(r):
+    share_need()
+    share_ensure_include()
+    hrun(["systemctl", "enable", "--now", "smbd"], check=False)
+    hrun(["systemctl", "enable", "--now", "nmbd"], check=False)
+    return "A Samba be van állítva.", share_collect()
+
+
+def op_share_list(r):
+    return "A lista frissítve.", share_collect()
+
+
+def op_share_restart(r):
+    share_need()
+    hrun(["systemctl", "restart", "smbd"])
+    hrun(["systemctl", "restart", "nmbd"], check=False)
+    return "A Samba újraindítva.", share_collect()
+
+
+def op_share_save(r):
+    share_need()
+    name = r.get("name", "")
+    if not isinstance(name, str) or not SHARE_NAME_RE.fullmatch(name) or name.lower() in SHARE_RESERVED:
+        raise RuntimeError("Érvénytelen megosztásnév (1–32 karakter: betű, szám, _ . -).")
+    edit = bool(r.get("edit"))
+    shares = share_read()
+    cur = next((s for s in shares if s["name"].lower() == name.lower()), None)
+    if edit and cur is None:
+        raise RuntimeError(f"Nincs ilyen megosztás: {name}")
+    if not edit:
+        if cur is not None:
+            raise RuntimeError(f"Már van ilyen nevű megosztás: {name}")
+        if name.lower() in share_main_names():
+            raise RuntimeError(f"Az smb.conf-ban már van ilyen nevű szakasz: {name}")
+    rp = share_path(r.get("path"))
+    mode = r.get("mode")
+    if mode not in SHARE_MODES:
+        raise RuntimeError("Ismeretlen hozzáférési mód.")
+    comment = SHARE_BAD_CHARS.sub("", str(r.get("comment") or "")).strip()[:120]
+    users, seen = [], set()
+    for u in (r.get("users") or [])[:64]:
+        n = share_principal(str(u.get("name", "")))
+        if n not in seen:
+            seen.add(n)
+            users.append({"name": n, "rw": bool(u.get("rw"))})
+    if mode == "users" and not users:
+        raise RuntimeError("Adj meg legalább egy felhasználót, vagy válassz jelszó nélküli hozzáférést.")
+    if mode == "guest_rw":
+        users = []
+    elif mode == "guest_ro":
+        users = [u for u in users if u["rw"]]
+    force = ""
+    if r.get("force_owner"):
+        try:
+            own = pwd.getpwuid(os.stat(rp).st_uid)
+        except KeyError:
+            own = None
+        if own is None or not 1000 <= own.pw_uid < 60000:
+            raise RuntimeError("A mappa tulajdonosa nem rendes felhasználó (pl. root), ezért a „tulajdonos "
+                               "nevében” opció nem használható: kapcsold ki, vagy add át a mappát egy felhasználónak.")
+        force = own.pw_name
+    entry = {"name": name if cur is None else cur["name"], "path": rp, "comment": comment, "mode": mode,
+             "users": users, "force_user": force, "available": bool(r.get("available", True))}
+    if cur is None:
+        shares.append(entry)
+    else:
+        shares[shares.index(cur)] = entry
+    share_write(shares)
+    note = share_guest_warn() if mode != "users" else ""
+    data = share_collect()
+    miss = [u["name"] for u in users if not u["name"].startswith("@") and u["name"] not in data["smb_users"]]
+    if miss:
+        note += " Figyelem: nincs Samba-jelszavuk, ezért nem tudnak belépni: " + ", ".join(miss) + "."
+    return f"Megosztás mentve: {name}." + note, data
+
+
+def op_share_delete(r):
+    share_need()
+    shares, cur = share_find(r.get("name"))
+    share_write([s for s in shares if s is not cur])
+    hrun(["smbcontrol", "smbd", "close-share", cur["name"]], check=False)
+    return f"A megosztás megszüntetve: {cur['name']}. A mappa és a fájlok érintetlenek.", share_collect()
+
+
+def op_share_toggle(r):
+    share_need()
+    shares, cur = share_find(r.get("name"))
+    cur["available"] = bool(r.get("available"))
+    share_write(shares)
+    if not cur["available"]:
+        hrun(["smbcontrol", "smbd", "close-share", cur["name"]], check=False)
+    return (f"Megosztás {'újra elérhető' if cur['available'] else 'szüneteltetve'}: {cur['name']}",
+            share_collect())
+
+
+def op_share_pw(r):
+    share_need()
+    u = share_unix_user(r.get("user"))
+    pw = r.get("password")
+    if not isinstance(pw, str) or not 6 <= len(pw) <= 128 or re.search(r"[\x00-\x1f\x7f]", pw):
+        raise RuntimeError("A jelszó 6–128 karakter lehet, vezérlőkarakter nélkül.")
+    hrun(["smbpasswd", "-s", "-a", u.pw_name], stdin_text=pw + "\n" + pw)
+    return f"A(z) {u.pw_name} Samba-jelszava beállítva.", share_collect()
+
+
+def op_share_pwdel(r):
+    share_need()
+    u = share_unix_user(r.get("user"))
+    hrun(["smbpasswd", "-x", u.pw_name])
+    return f"A(z) {u.pw_name} Samba-hozzáférése törölve (a megosztások listáin megmarad a neve).", share_collect()
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
        "wg_delete": op_wg_delete, "wg_autostart": op_wg_autostart,
+       "share_setup": op_share_setup, "share_list": op_share_list, "share_save": op_share_save,
+       "share_delete": op_share_delete, "share_toggle": op_share_toggle, "share_pw": op_share_pw,
+       "share_pwdel": op_share_pwdel, "share_restart": op_share_restart,
        "ad_join": op_ad_join, "ad_leave": op_ad_leave}
 
 
@@ -1323,6 +1676,8 @@ def gui_main(helper=None, run=True):
             self.pkgrows = []
             self.bg_path = None
             self.wg_profiles, self.wg_loaded, self.wg_editing = [], False, None
+            self.sh_data, self.sh_loaded, self.sh_editing = {}, False, None
+            self.sh_users, self.sh_edit_avail = [], True
 
             outer = Gtk.Box(orientation=V)
             self.add(outer)
@@ -1334,9 +1689,11 @@ def gui_main(helper=None, run=True):
             self.stack.set_transition_type(Gtk.StackTransitionType.NONE)
             pages = [("Bejelentkező ablak", self.page_login), ("Távoli segítség", self.page_remote),
                      ("Felhő tárhely", self.page_cloud), ("Tartományba léptetés", self.page_domain),
-                     ("WireGuard VPN", self.page_wg), ("Rendszeridő", self.page_time), ("Rendszer", self.page_system)]
+                     ("WireGuard VPN", self.page_wg), ("Mappamegosztás", self.page_share),
+                     ("Rendszeridő", self.page_time), ("Rendszer", self.page_system)]
             self.page_names = []
             self.wg_idx = [t for t, _b in pages].index("WireGuard VPN")
+            self.sh_idx = [t for t, _b in pages].index("Mappamegosztás")
             for i, (title, builder) in enumerate(pages):
                 row = Gtk.ListBoxRow()
                 lab = Gtk.Label(label=title, xalign=0)
@@ -1380,6 +1737,8 @@ def gui_main(helper=None, run=True):
                 self.stack.set_visible_child_name(self.page_names[row.get_index()])
                 if row.get_index() == self.wg_idx and not self.wg_loaded and pkg_ok("wireguard-tools"):
                     self.wg_refresh()
+                if row.get_index() == self.sh_idx and not self.sh_loaded and pkg_ok("samba"):
+                    self.sh_refresh()
 
         def mk_page(self, title, sub=""):
             box = Gtk.Box(orientation=V, spacing=8)
@@ -1563,6 +1922,21 @@ def gui_main(helper=None, run=True):
                 self.wg_hint.set_text(hint)
                 if ok and not self.wg_loaded and self.stack.get_visible_child_name() == self.page_names[self.wg_idx]:
                     self.wg_refresh()
+            if hasattr(self, "sh_ctrls"):
+                ok = pkg_ok("samba")
+                for w in self.sh_ctrls:
+                    w.set_sensitive(ok)
+                if not ok:
+                    hint = "⚠ A Samba nincs telepítve: előbb telepítsd fent."
+                elif svc_active("smbd"):
+                    hint = ("● A Samba fut. Ha a gépen tűzfal is van, a 445/tcp portot (és a névkereséshez a "
+                            "139/tcp, 137–138/udp portot) engedélyezni kell. "
+                            "Megosztás létrehozásához, módosításához és törléséhez rendszergazdai jelszó kell.")
+                else:
+                    hint = "○ A Samba szolgáltatás nem fut: próbáld a „Samba újraindítása” gombot."
+                self.sh_hint.set_text(hint)
+                if ok and not self.sh_loaded and self.stack.get_visible_child_name() == self.page_names[self.sh_idx]:
+                    self.sh_refresh()
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
@@ -2200,6 +2574,381 @@ def gui_main(helper=None, run=True):
             self.wg_editing = None
             self.wg_clear_form()
             self.wg_exp.set_expanded(False)
+
+        # ------------------------------------------------------------ Mappamegosztás
+        def page_share(self):
+            b = self.mk_page("Mappamegosztás",
+                             "Mappa megosztása a hálózaton (Samba/SMB: Windows, Linux és Mac gépekről is elérhető). "
+                             "Itt megszüntetheted vagy szüneteltetheted a megosztást, és beállíthatod, ki mit "
+                             "érhet el rajta.")
+            self.pkg_row(b, "Samba fájlszerver", "A samba csomag (smbd, nmbd) a Debian-tárolóból.", "samba",
+                         [("pkg", {"action": "install", "pkgs": ["samba"]}), ("share_setup", {})],
+                         [("pkg", {"action": "remove", "pkgs": ["samba"]})])
+            self.head(b, "Megosztott mappák")
+            bar = Gtk.Box(spacing=8)
+            self.sh_ctrls = [self.btn("Új megosztás…", self.sh_new),
+                             self.btn("Lista frissítése", self.sh_refresh),
+                             self.btn("Samba újraindítása", self.sh_restart)]
+            for w in self.sh_ctrls:
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.sh_hint = self.lab("")
+            b.pack_start(self.sh_hint, False, False, 0)
+            self.sh_box = Gtk.Box(orientation=V, spacing=4)
+            b.pack_start(self.sh_box, False, False, 4)
+
+            # --- űrlap (új / szerkesztés)
+            self.sh_exp = Gtk.Expander(label="Megosztás")
+            g = Gtk.Grid(column_spacing=10, row_spacing=6)
+            g.set_margin_start(12)
+            g.set_margin_top(6)
+            self.sh_e = {}
+
+            def entry(key, label, row, width, ph=""):
+                g.attach(Gtk.Label(label=label, xalign=1), 0, row, 1, 1)
+                e = Gtk.Entry()
+                e.set_width_chars(min(width, 12))
+                e.set_hexpand(True)
+                e.set_placeholder_text(ph)
+                g.attach(e, 1, row, 1, 1)
+                self.sh_e[key] = e
+                return e
+            entry("name", "Megosztás neve:", 0, 24, "pl. kozos (betű, szám, _ . -)")
+            entry("path", "Mappa:", 1, 44, "/home/felhasznalo/mappa")
+            g.attach(self.btn("Tallózás…", self.sh_browse), 2, 1, 1, 1)
+            entry("comment", "Megjegyzés (nem kötelező):", 2, 44)
+            g.attach(Gtk.Label(label="Ki érheti el:", xalign=1, yalign=0), 0, 3, 1, 1)
+            mb = Gtk.Box(orientation=V, spacing=2)
+            r1 = Gtk.RadioButton.new_with_label_from_widget(None, "Csak a megadott felhasználók (jelszavas belépés)")
+            r2 = Gtk.RadioButton.new_with_label_from_widget(
+                r1, "Bárki a hálózaton jelszó nélkül, csak olvashat (a felsoroltak írhatnak is)")
+            r3 = Gtk.RadioButton.new_with_label_from_widget(
+                r1, "Bárki a hálózaton jelszó nélkül, olvashat és írhat is")
+            self.sh_radios = {"users": r1, "guest_ro": r2, "guest_rw": r3}
+            for r in (r1, r2, r3):
+                r.get_child().set_line_wrap(True)
+                mb.pack_start(r, False, False, 0)
+                r.connect("toggled", self.sh_mode_changed)
+            g.attach(mb, 1, 3, 2, 1)
+            g.attach(Gtk.Label(label="Felhasználók és jogaik:", xalign=1, yalign=0), 0, 4, 1, 1)
+            ub = Gtk.Box(orientation=V, spacing=4)
+            self.sh_ubox = Gtk.Box(orientation=V, spacing=3)
+            ub.pack_start(self.sh_ubox, False, False, 0)
+            add = Gtk.Box(spacing=6)
+            self.sh_combo = Gtk.ComboBoxText.new_with_entry()
+            add.pack_start(self.sh_combo, True, True, 0)
+            add.pack_start(self.btn("Hozzáadás", self.sh_user_add), False, False, 0)
+            ub.pack_start(add, False, False, 0)
+            ub.pack_start(self.lab("„Írhat” jelölés nélkül a felhasználó csak olvashat. Csoportot @csoportnév "
+                                   "alakban adj meg. A jelszavas belépéshez a felhasználónak Samba-jelszó kell "
+                                   "(lejjebb állítható)."), False, False, 0)
+            self.sh_uwrap = ub
+            g.attach(ub, 1, 4, 2, 1)
+            self.sh_c_force = Gtk.CheckButton(label="A mappa tulajdonosa nevében érjék el a fájlokat (ajánlott)")
+            self.sh_c_force.set_active(True)
+            g.attach(self.sh_c_force, 1, 5, 2, 1)
+            g.attach(self.lab("Így a hálózati felhasználóknak nem kell külön fájlrendszer-jog: a jogokat "
+                              "itt, a megosztáson állítod be. Az új fájlok a tulajdonos nevén jönnek létre."),
+                     1, 6, 2, 1)
+            hb = Gtk.Box(spacing=8)
+            hb.pack_start(self.btn("Mentés", self.sh_save), False, False, 0)
+            hb.pack_start(self.btn("Mégse", self.sh_cancel), False, False, 0)
+            g.attach(hb, 1, 7, 1, 1)
+            self.sh_exp.add(g)
+            b.pack_start(self.sh_exp, False, False, 6)
+
+            self.head(b, "Hálózati jelszavak (Samba)")
+            b.pack_start(self.lab("A jelszavas megosztásokhoz a felhasználónak külön Samba-jelszó kell; ez lehet "
+                                  "más, mint a gépre belépés jelszava."), False, False, 0)
+            self.sh_smbbox = Gtk.Box(orientation=V, spacing=2)
+            b.pack_start(self.sh_smbbox, False, False, 4)
+            self.head(b, "Most csatlakozott gépek")
+            self.sh_sess = Gtk.Label(xalign=0)
+            self.sh_sess.set_selectable(True)
+            ssw = Gtk.ScrolledWindow()
+            ssw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+            ssw.set_propagate_natural_height(True)
+            ssw.add(self.sh_sess)
+            b.pack_start(ssw, False, False, 0)
+            self.sh_render()
+            self.sh_users_render()
+            return b
+
+        # --- lista
+        def sh_render(self):
+            d = self.sh_data
+            shares = d.get("shares") or []
+            for c in self.sh_box.get_children():
+                self.sh_box.remove(c)
+            if not shares:
+                self.sh_box.pack_start(self.lab("(Nincs megosztott mappa.)"), False, False, 0)
+            for s in shares:
+                self.sh_box.pack_start(self.sh_row(s), False, False, 0)
+            self.sh_box.show_all()
+            self.sh_combo.remove_all()
+            for u in d.get("users") or []:
+                self.sh_combo.append_text(u)
+            for gname in d.get("groups") or []:
+                self.sh_combo.append_text("@" + gname)
+            for c in self.sh_smbbox.get_children():
+                self.sh_smbbox.remove(c)
+            users = d.get("users") or []
+            smb = set(d.get("smb_users") or [])
+            if not users:
+                self.sh_smbbox.pack_start(self.lab("(Nincs rendes felhasználó a gépen.)"), False, False, 0)
+            for u in users:
+                self.sh_smbbox.pack_start(self.sh_smb_row(u, u in smb), False, False, 0)
+            self.sh_smbbox.show_all()
+            sess = d.get("sessions") or ""
+            if sess:
+                self.sh_sess.set_markup("<tt>" + GLib.markup_escape_text(sess) + "</tt>")
+            else:
+                self.sh_sess.set_text("(Nincs adat, vagy senki sincs csatlakozva.)")
+
+        def sh_row(self, s):
+            name = s["name"]
+            on = s.get("available", True)
+            smb = set(self.sh_data.get("smb_users") or [])
+            host = os.uname().nodename
+            box = Gtk.Box(orientation=V, spacing=2)
+            row = Gtk.Box(spacing=10)
+            left = Gtk.Box(orientation=V, spacing=2)
+            t = Gtk.Label(xalign=0)
+            state = ('<span foreground="#15803d">● megosztva</span>' if on
+                     else '<span foreground="#b45309">⏸ szünetel</span>')
+            t.set_markup(f"<b>{GLib.markup_escape_text(name)}</b>   {state}")
+            left.pack_start(t, False, False, 0)
+            owner = f"   (tulajdonos: {s['owner']})" if s.get("owner") else ""
+            left.pack_start(self.lab("Mappa: " + s["path"] + owner), False, False, 0)
+            if s["mode"] == "guest_rw":
+                acc = "Bárki, jelszó nélkül: olvasás és írás"
+            elif s["mode"] == "guest_ro":
+                acc = "Bárki, jelszó nélkül: csak olvasás"
+                if s["users"]:
+                    acc += "; írhat: " + ", ".join(u["name"] for u in s["users"])
+            else:
+                acc = "Csak ők érhetik el: " + ", ".join(
+                    u["name"] + (" (írás)" if u["rw"] else " (olvasás)") for u in s["users"])
+            left.pack_start(self.lab(acc), False, False, 0)
+            if s.get("comment"):
+                left.pack_start(self.lab("Megjegyzés: " + s["comment"]), False, False, 0)
+            unc = self.lab(f"Elérés: \\\\{host}\\{name}   vagy   smb://{host}/{name}")
+            unc.set_selectable(True)
+            left.pack_start(unc, False, False, 0)
+            if not s.get("path_ok", True):
+                left.pack_start(self.lab("⚠ A mappa nem létezik vagy nem érhető el."), False, False, 0)
+            miss = [u["name"] for u in s["users"] if not u["name"].startswith("@") and u["name"] not in smb]
+            if miss:
+                left.pack_start(self.lab("⚠ Nincs Samba-jelszavuk, ezért nem tudnak belépni: " + ", ".join(miss)),
+                                False, False, 0)
+            sw = Gtk.Switch()
+            sw.set_active(on)
+            sw.set_valign(Gtk.Align.CENTER)
+            sw.connect("state-set", self.on_sh_switch, name)
+            be = self.btn("Szerkesztés", lambda *_: self.sh_edit(s))
+            bd = self.btn("Megszüntetés", lambda *_: self.sh_delete(name))
+            row.pack_start(left, True, True, 0)
+            for w in (sw, be, bd):
+                w.set_valign(Gtk.Align.CENTER)
+                row.pack_start(w, False, False, 0)
+            box.pack_start(row, False, False, 4)
+            box.pack_start(Gtk.Separator(), False, False, 2)
+            return box
+
+        def sh_smb_row(self, user, has):
+            row = Gtk.Box(spacing=10)
+            nm = Gtk.Label(xalign=0)
+            nm.set_markup(f"<b>{GLib.markup_escape_text(user)}</b>   " +
+                          ('<span foreground="#15803d">● van Samba-jelszava</span>' if has
+                           else '<span foreground="#6b7280">○ nincs Samba-jelszava</span>'))
+            row.pack_start(nm, True, True, 0)
+            row.pack_start(self.btn("Jelszó beállítása…" if not has else "Jelszó módosítása…",
+                                    lambda *_: self.sh_setpw(user)), False, False, 0)
+            if has:
+                row.pack_start(self.btn("Hozzáférés törlése", lambda *_: self.sh_pwdel(user)), False, False, 0)
+            return row
+
+        def on_sh_switch(self, sw, state, name):
+            if not self.busy:
+                self.run_task([("share_toggle", {"name": name, "available": bool(state)})], self.sh_done)
+            return True        # a kapcsoló állapotát a művelet után a lista újrarajzolása állítja be
+
+        def sh_delete(self, name):
+            if self.confirm(f"Megszünteted a(z) {name} megosztását? A mappa és a benne lévő fájlok megmaradnak, "
+                            "de a hálózaton már nem lesz elérhető, a csatlakozott gépekről azonnal lekapcsolódik."):
+                self.run_task([("share_delete", {"name": name})], self.sh_done)
+
+        def sh_refresh(self, *_):
+            if self.run_task([("share_list", {})], self.sh_done):
+                self.sh_loaded = True
+                return True
+            return False
+
+        def sh_restart(self, *_):
+            self.run_task([("share_restart", {})], self.sh_done)
+
+        def sh_done(self, rc, msg, data):
+            if isinstance(data, dict):
+                self.sh_data = data
+                self.sh_render()
+
+        # --- Samba-jelszavak
+        def sh_setpw(self, user):
+            d = Gtk.Dialog(title=f"Samba-jelszó: {user}", transient_for=self, modal=True)
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Beállítás", Gtk.ResponseType.OK)
+            d.set_default_response(Gtk.ResponseType.OK)
+            area = d.get_content_area()
+            area.set_border_width(14)
+            area.set_spacing(8)
+            area.pack_start(self.lab("Ezzel a jelszóval lép be a felhasználó a hálózati megosztásokhoz "
+                                     "(legalább 6 karakter)."), False, False, 0)
+            e1, e2 = Gtk.Entry(), Gtk.Entry()
+            for e, ph in ((e1, "Új jelszó"), (e2, "Jelszó még egyszer")):
+                e.set_visibility(False)
+                e.set_placeholder_text(ph)
+                e.set_activates_default(True)
+                area.pack_start(e, False, False, 0)
+            d.show_all()
+            resp = d.run()
+            p1, p2 = e1.get_text(), e2.get_text()
+            d.destroy()
+            if resp != Gtk.ResponseType.OK:
+                return
+            if p1 != p2:
+                self.say(1, "A két jelszó nem egyezik.")
+                return
+            if len(p1) < 6:
+                self.say(1, "A jelszó legalább 6 karakter legyen.")
+                return
+            self.run_task([("share_pw", {"user": user, "password": p1})], self.sh_done)
+
+        def sh_pwdel(self, user):
+            if self.confirm(f"Törlöd {user} Samba-hozzáférését? A hálózaton nem tud majd belépni, "
+                            "a gépre belépési jelszava nem változik."):
+                self.run_task([("share_pwdel", {"user": user})], self.sh_done)
+
+        # --- űrlap
+        def sh_mode(self):
+            return next((k for k, r in self.sh_radios.items() if r.get_active()), "users")
+
+        def sh_mode_changed(self, *_):
+            self.sh_uwrap.set_sensitive(self.sh_mode() != "guest_rw")
+
+        def sh_users_render(self):
+            for c in self.sh_ubox.get_children():
+                self.sh_ubox.remove(c)
+            if not self.sh_users:
+                self.sh_ubox.pack_start(self.lab("(Még nincs felhasználó a listában.)"), False, False, 0)
+            for u in self.sh_users:
+                row = Gtk.Box(spacing=10)
+                row.pack_start(Gtk.Label(label=u["name"], xalign=0), True, True, 0)
+                cw = Gtk.CheckButton(label="Írhat")
+                cw.set_active(u["rw"])
+                cw.connect("toggled", lambda c, u=u: u.update(rw=c.get_active()))
+                row.pack_start(cw, False, False, 0)
+                row.pack_start(self.btn("Eltávolítás", lambda _b, u=u: self.sh_user_del(u)), False, False, 0)
+                self.sh_ubox.pack_start(row, False, False, 0)
+            self.sh_ubox.show_all()
+
+        def sh_user_add(self, *_):
+            n = (self.sh_combo.get_active_text() or "").strip()
+            if not n:
+                return
+            if n in (self.sh_data.get("groups") or []) and n not in (self.sh_data.get("users") or []):
+                n = "@" + n
+            if not any(u["name"] == n for u in self.sh_users):
+                self.sh_users.append({"name": n, "rw": False})
+                self.sh_users_render()
+            self.sh_combo.get_child().set_text("")
+
+        def sh_user_del(self, u):
+            self.sh_users = [x for x in self.sh_users if x is not u]
+            self.sh_users_render()
+
+        def sh_clear_form(self):
+            for e in self.sh_e.values():
+                e.set_text("")
+                e.set_sensitive(True)
+            self.sh_radios["users"].set_active(True)
+            self.sh_users = []
+            self.sh_users_render()
+            self.sh_c_force.set_active(True)
+            self.sh_edit_avail = True
+            self.sh_mode_changed()
+
+        def sh_new(self, *_):
+            self.sh_editing = None
+            self.sh_clear_form()
+            self.sh_exp.set_label("Új megosztás")
+            self.sh_exp.set_expanded(True)
+            self.sh_e["name"].grab_focus()
+
+        def sh_edit(self, s):
+            self.sh_clear_form()
+            self.sh_editing = s["name"]
+            e = self.sh_e
+            e["name"].set_text(s["name"])
+            e["name"].set_sensitive(False)
+            e["path"].set_text(s["path"])
+            e["comment"].set_text(s.get("comment") or "")
+            self.sh_radios[s["mode"]].set_active(True)
+            self.sh_users = [dict(u) for u in s["users"]]
+            self.sh_users_render()
+            self.sh_c_force.set_active(bool(s.get("force_user")))
+            self.sh_edit_avail = s.get("available", True)
+            self.sh_exp.set_label(f"Megosztás szerkesztése: {s['name']}")
+            self.sh_exp.set_expanded(True)
+
+        def sh_browse(self, *_):
+            d = Gtk.FileChooserDialog(title="Megosztandó mappa kiválasztása", transient_for=self,
+                                      action=Gtk.FileChooserAction.SELECT_FOLDER)
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Kiválasztás", Gtk.ResponseType.OK)
+            cur = self.sh_e["path"].get_text().strip()
+            d.set_current_folder(cur if cur.startswith("/") and os.path.isdir(cur) else os.path.expanduser("~"))
+            path = d.get_filename() if d.run() == Gtk.ResponseType.OK else None
+            d.destroy()
+            if path:
+                self.sh_e["path"].set_text(path)
+                if not self.sh_e["name"].get_text().strip() and self.sh_editing is None:
+                    stem = re.sub(r"[^A-Za-z0-9_.-]", "", os.path.basename(path.rstrip("/")))[:32]
+                    self.sh_e["name"].set_text(stem)
+
+        def sh_save(self, *_):
+            e = self.sh_e
+            name, path = e["name"].get_text().strip(), e["path"].get_text().strip()
+            mode = self.sh_mode()
+            edit = self.sh_editing is not None
+            if not SHARE_NAME_RE.fullmatch(name) or name.lower() in SHARE_RESERVED:
+                self.say(1, "A megosztás neve 1–32 karakter lehet: betű, szám, _ . -")
+                return
+            if not path.startswith("/") or not os.path.isdir(path):
+                self.say(1, "Válaszd ki a megosztandó mappát.")
+                return
+            if not share_path_ok(os.path.realpath(path)):
+                self.say(1, "Csak a /home, /srv, /mnt, /media, /opt, /data és /shares alatti mappa osztható meg.")
+                return
+            if mode == "users" and not self.sh_users:
+                self.say(1, "Adj hozzá legalább egy felhasználót, vagy válassz jelszó nélküli hozzáférést.")
+                return
+            if mode == "guest_rw" and not self.confirm(
+                    "Bárki, aki eléri ezt a gépet a hálózaton, jelszó nélkül módosíthatja és törölheti a mappa "
+                    "tartalmát. Biztosan így állítod be?"):
+                return
+            self.run_task([("share_save", {"name": name, "path": path, "comment": e["comment"].get_text().strip(),
+                                           "mode": mode, "users": self.sh_users,
+                                           "force_owner": self.sh_c_force.get_active(),
+                                           "available": self.sh_edit_avail if edit else True,
+                                           "edit": edit})], self.sh_saved)
+
+        def sh_saved(self, rc, msg, data):
+            self.sh_done(rc, msg, data)
+            if rc == 0:
+                self.sh_cancel()
+
+        def sh_cancel(self, *_):
+            self.sh_editing = None
+            self.sh_clear_form()
+            self.sh_exp.set_expanded(False)
 
         # --------------------------------------------------------------- Rendszer
         def page_system(self):
