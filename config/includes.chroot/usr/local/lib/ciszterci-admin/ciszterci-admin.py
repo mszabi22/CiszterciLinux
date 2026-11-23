@@ -1650,6 +1650,143 @@ def default_dm():
         return "ismeretlen"
 
 
+# ------------------------------------------------------------- XP (Luna) kinézet
+XP_DUPLA_KATTINTAS = False   # True: a kezdőlapon dupla kattintás nyit (mint az eredeti XP-ben)
+
+_SVG_HEAD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs>'
+             '<linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b97f5"/>'
+             '<stop offset="1" stop-color="#1a3fa8"/></linearGradient>'
+             '<linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f4ea"/>'
+             '<stop offset="1" stop-color="#b3af9c"/></linearGradient>'
+             '<linearGradient id="y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0a0"/>'
+             '<stop offset="1" stop-color="#e5b53a"/></linearGradient>'
+             '<linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ecff"/>'
+             '<stop offset="1" stop-color="#4a8fe6"/></linearGradient>'
+             '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fdc6c"/>'
+             '<stop offset="1" stop-color="#1f8f1f"/></linearGradient></defs>')
+
+XP_SVG = {
+    "login": '<rect x="3" y="5" width="42" height="30" rx="3" fill="url(#b)" stroke="#6e6a58"/>'
+             '<rect x="7" y="9" width="34" height="22" fill="url(#a)" stroke="#0b2a7a"/>'
+             '<circle cx="24" cy="17" r="5" fill="#fff"/><path d="M14 31 C14 23 34 23 34 31 Z" fill="#fff"/>'
+             '<rect x="19" y="35" width="10" height="4" fill="#a8a493"/>'
+             '<rect x="12" y="39" width="24" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>',
+    "remote": '<circle cx="24" cy="24" r="15" fill="none" stroke="#fff" stroke-width="8"/>'
+              '<circle cx="24" cy="24" r="15" fill="none" stroke="#e03a2a" stroke-width="8" '
+              'stroke-dasharray="11.78 11.78"/>'
+              '<circle cx="24" cy="24" r="19" fill="none" stroke="#7a1a1a"/>'
+              '<circle cx="24" cy="24" r="11" fill="none" stroke="#7a1a1a"/>',
+    "cloud": '<g fill="#1d4fa0" stroke="#1d4fa0" stroke-width="2.4"><circle cx="15" cy="28" r="8"/>'
+             '<circle cx="25" cy="21" r="10"/><circle cx="34" cy="28" r="8"/><rect x="15" y="28" width="19" height="8"/></g>'
+             '<g fill="url(#c)"><circle cx="15" cy="28" r="8"/><circle cx="25" cy="21" r="10"/>'
+             '<circle cx="34" cy="28" r="8"/><rect x="15" y="28" width="19" height="8"/></g>'
+             '<path d="M24 34 V22 M19 27 L24 22 L29 27" stroke="#fff" stroke-width="3" fill="none" '
+             'stroke-linecap="round" stroke-linejoin="round"/>',
+    "domain": '<path d="M24 18 V26 M12 26 H36 M12 26 V30 M36 26 V30" stroke="#5a5748" stroke-width="2" fill="none"/>'
+              '<rect x="12" y="4" width="24" height="14" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="16" y="8" width="12" height="2" fill="#6e6a58"/><rect x="16" y="12" width="12" height="2" fill="#6e6a58"/>'
+              '<circle cx="32" cy="11" r="2" fill="#3ccf3c"/>'
+              '<rect x="3" y="30" width="18" height="12" rx="1.5" fill="url(#a)" stroke="#0b2a7a"/>'
+              '<rect x="27" y="30" width="18" height="12" rx="1.5" fill="url(#a)" stroke="#0b2a7a"/>',
+    "vpn": '<path d="M24 3 L41 9 V23 C41 34 33 41 24 45 C15 41 7 34 7 23 V9 Z" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+           '<path d="M19 23 V20 A5 5 0 0 1 29 20 V23" stroke="#fff" stroke-width="3" fill="none"/>'
+           '<rect x="16" y="23" width="16" height="12" rx="2" fill="#ffd451" stroke="#a77c00"/>',
+    "share": '<path d="M4 10 H18 L21 14 H44 V40 H4 Z" fill="#e5b53a" stroke="#a77c00"/>'
+             '<path d="M4 19 H44 V40 H4 Z" fill="url(#y)" stroke="#a77c00"/>'
+             '<circle cx="36" cy="34" r="9" fill="url(#a)" stroke="#fff" stroke-width="1.5"/>'
+             '<path d="M31 34 H40 M36 30 L40 34 L36 38" stroke="#fff" stroke-width="2.5" fill="none" '
+             'stroke-linecap="round" stroke-linejoin="round"/>',
+    "time": '<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b2a7a"/>'
+            '<circle cx="24" cy="24" r="16" fill="#fff" stroke="#8a8a8a"/>'
+            '<path d="M24 10 V13 M24 35 V38 M10 24 H13 M35 24 H38" stroke="#333" stroke-width="2"/>'
+            '<path d="M24 24 V15" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>'
+            '<path d="M24 24 L32 28" stroke="#222" stroke-width="2" stroke-linecap="round"/>'
+            '<path d="M24 24 L19 31" stroke="#d22" stroke-width="1.2"/><circle cx="24" cy="24" r="2" fill="#222"/>',
+    "system": '<rect x="3" y="7" width="30" height="24" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="6" y="10" width="24" height="18" fill="url(#a)" stroke="#0b2a7a"/>'
+              '<rect x="14" y="31" width="8" height="4" fill="#a8a493"/>'
+              '<rect x="9" y="35" width="18" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="35" y="14" width="10" height="26" rx="1.5" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="37" y="18" width="6" height="2" fill="#6e6a58"/><circle cx="40" cy="35" r="1.5" fill="#3ccf3c"/>'
+              '<path d="M12 19 L17 24 L25 14" stroke="#fff" stroke-width="3" fill="none" '
+              'stroke-linecap="round" stroke-linejoin="round"/>',
+    "back": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+            '<path d="M27 12 L15 24 L27 36 M15 24 H37" stroke="#fff" stroke-width="5" fill="none" '
+            'stroke-linecap="round" stroke-linejoin="round"/>',
+    "fwd": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+           '<path d="M21 12 L33 24 L21 36 M33 24 H11" stroke="#fff" stroke-width="5" fill="none" '
+           'stroke-linecap="round" stroke-linejoin="round"/>',
+    "up": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+          '<path d="M12 27 L24 15 L36 27 M24 15 V37" stroke="#fff" stroke-width="5" fill="none" '
+          'stroke-linecap="round" stroke-linejoin="round"/>',
+}
+XP_FALLBACK_ICON = {"login": "system-users", "remote": "help-browser", "cloud": "folder-remote",
+                    "domain": "network-workgroup", "vpn": "network-vpn", "share": "folder-publicshare",
+                    "time": "preferences-system-time", "system": "computer",
+                    "back": "go-previous", "fwd": "go-next", "up": "go-up"}
+
+XP_CSS = """
+window.xp { background-color: #ECE9D8; }
+.xp * { font-family: Tahoma, "DejaVu Sans", "Noto Sans", sans-serif; font-size: 9pt; }
+.xp .monospace, .xp textview.monospace { font-family: monospace; }
+.xp label, .xp checkbutton, .xp radiobutton { color: #000000; }
+.xp label:disabled { color: #ACA899; }
+.xp separator { background-color: #ACA899; min-height: 1px; min-width: 1px; }
+.xp scrolledwindow.xp-scroll, .xp scrolledwindow.xp-scroll viewport { background-color: #ECE9D8; }
+.xp textview text { background-color: #FFFFFF; color: #000000; }
+
+.xp button { background-image: linear-gradient(to bottom, #FFFFFF, #ECEBE5 85%, #D6D0C5);
+             background-color: #ECEBE5; border: 1px solid #003C74; border-radius: 3px;
+             padding: 3px 12px; color: #000000; box-shadow: none; text-shadow: none; min-height: 0; }
+.xp button:hover { box-shadow: inset 0 0 0 2px #FFC83C; }
+.xp button:active { background-image: linear-gradient(to bottom, #CDCAC3, #E3E3DB); box-shadow: none; }
+.xp button:disabled { color: #ACA899; border-color: #C9C7BA; background-image: none; background-color: #F4F2E8; }
+
+.xp entry, .xp spinbutton { background-color: #FFFFFF; color: #000000; border: 1px solid #7F9DB9;
+                            border-radius: 0; box-shadow: none; padding: 2px 3px; min-height: 0; }
+.xp entry:focus { border-color: #316AC5; }
+.xp frame > border { border: 1px solid #D0D0BF; border-radius: 3px; }
+
+.xp progressbar trough { background-color: #FFFFFF; border: 1px solid #686868; border-radius: 3px; min-height: 12px; }
+.xp progressbar progress { background-image: repeating-linear-gradient(to right, #37D237 0px, #37D237 7px, #FFFFFF 7px, #FFFFFF 9px);
+                           border: none; border-radius: 0; min-height: 10px; }
+
+.xp menubar { background-image: none; background-color: #ECE9D8; border-bottom: 1px solid #ACA899; }
+.xp menubar > menuitem { padding: 3px 8px; }
+.xp menubar > menuitem:hover { background-color: #316AC5; }
+.xp menubar > menuitem:hover label { color: #FFFFFF; }
+
+.xp .xp-toolbar { background-image: linear-gradient(to bottom, #F7F6EF, #ECE9D8); padding: 2px 4px;
+                  border-bottom: 1px solid #ACA899; }
+.xp button.xp-tool { background-image: none; background-color: transparent; border: 1px solid transparent;
+                     border-radius: 3px; padding: 2px 6px; box-shadow: none; }
+.xp button.xp-tool:hover { border-color: #ACA899; background-image: linear-gradient(to bottom, #FFFFFF, #E8E6DA); box-shadow: none; }
+.xp button.xp-tool:disabled { background-image: none; background-color: transparent; border-color: transparent; opacity: 0.45; }
+.xp .xp-addrrow { background-color: #ECE9D8; padding: 3px 6px; border-bottom: 1px solid #ACA899; }
+.xp .xp-addr { background-color: #FFFFFF; border: 1px solid #7F9DB9; padding: 2px 4px; }
+
+.xp .xp-left { background-image: linear-gradient(to bottom, #7BA2E7, #6375D6); padding: 12px 10px; }
+.xp .xp-tb-head { background-image: linear-gradient(to right, #FFFFFF, #C6D3F7); border-radius: 6px 6px 0px 0px; padding: 4px 8px; }
+.xp .xp-tb-head label { color: #215DC6; font-weight: bold; }
+.xp .xp-tb-body { background-color: #D6DFF7; border-style: solid; border-color: #FFFFFF; border-width: 0px 1px 1px 1px; padding: 6px 8px; }
+.xp label.xp-det-title { font-weight: bold; }
+.xp button.xp-link { background-image: none; background-color: transparent; border: none; box-shadow: none; padding: 2px 0px; }
+.xp button.xp-link:hover { background-image: none; background-color: transparent; box-shadow: none; }
+.xp button.xp-link label { color: #215DC6; }
+.xp button.xp-link:hover label { color: #428EFF; text-decoration: underline; }
+
+.xp .xp-home, .xp .xp-home viewport, .xp .xp-home flowbox { background-color: #FFFFFF; }
+.xp .xp-home flowboxchild:hover { background-color: #EAF1FB; }
+.xp .xp-home flowboxchild:selected { background-color: #316AC5; }
+.xp .xp-home flowboxchild:selected label { color: #FFFFFF; }
+
+.xp .xp-pagehead { background-image: linear-gradient(to right, #FFFFFF, #CCD9F5); border-bottom: 1px solid #7F9DB9; padding: 10px 18px; }
+.xp label.xp-pagetitle { font-size: 15pt; font-weight: bold; color: #1D3E8F; }
+.xp label.xp-head { color: #0046D5; border-bottom: 1px solid #D0D0BF; padding-bottom: 2px; }
+.xp .xp-status { background-color: #ECE9D8; border-top: 1px solid #ACA899; }
+"""
+
+
 def gui_main(helper=None, run=True):
     import gi
     import locale
@@ -1663,6 +1800,29 @@ def gui_main(helper=None, run=True):
     GLib.set_application_name("Ciszterci Admin")
     Gtk.Window.set_default_icon_name("ciszterci-admin")
     V, H = Gtk.Orientation.VERTICAL, Gtk.Orientation.HORIZONTAL
+
+    def xp_image(kind, size):
+        """XP-szerű ikon (beágyazott SVG); ha az SVG-betöltő hiányzik, a téma ikonja."""
+        svg = _SVG_HEAD + XP_SVG.get(kind, "") + "</svg>"
+        try:
+            ld = GdkPixbuf.PixbufLoader.new_with_type("svg")
+            ld.set_size(size, size)
+            ld.write(svg.encode("utf-8"))
+            ld.close()
+            return Gtk.Image.new_from_pixbuf(ld.get_pixbuf())
+        except Exception:
+            return Gtk.Image.new_from_icon_name(XP_FALLBACK_ICON.get(kind, "image-missing"), Gtk.IconSize.DIALOG)
+
+    def xp_apply_css():
+        from gi.repository import Gdk
+        prov = Gtk.CssProvider()
+        try:
+            prov.load_from_data(XP_CSS.encode("utf-8"))
+        except GLib.Error as e:
+            print("XP-stílus betöltési hiba:", e.message, file=sys.stderr)
+            return
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     class Win(Gtk.Window):
         def __init__(self, helper):
@@ -1679,40 +1839,53 @@ def gui_main(helper=None, run=True):
             self.sh_data, self.sh_loaded, self.sh_editing = {}, False, None
             self.sh_users, self.sh_edit_avail = [], True
 
+            self.get_style_context().add_class("xp")
+            xp_apply_css()
+            pages = [
+                ("Bejelentkező ablak", self.page_login, "login",
+                 "A bejelentkező képernyő (LightDM) megjelenésének és működésének beállítása."),
+                ("Távoli segítség", self.page_remote, "remote",
+                 "Programok, amelyekkel egy rendszergazda távolról segíthet."),
+                ("Felhő tárhely", self.page_cloud, "cloud",
+                 "Felhő tárhely kliens (Nextcloud) telepítése és eltávolítása."),
+                ("Tartományba léptetés", self.page_domain, "domain",
+                 "A gép felvétele a tartományba (Active Directory), illetve kivétele onnan."),
+                ("WireGuard VPN", self.page_wg, "vpn",
+                 "VPN-profilok importálása, kezelése, a VPN ki- és bekapcsolása."),
+                ("Mappamegosztás", self.page_share, "share",
+                 "Mappák megosztása a hálózaton (Samba), jogosultságokkal."),
+                ("Rendszeridő", self.page_time, "time",
+                 "Dátum, idő és az internetes időszinkron beállítása."),
+                ("Rendszer", self.page_system, "system",
+                 "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás.")]
+            self.pages_meta = pages
+            self.page_names = []
+            self.wg_idx = [p[0] for p in pages].index("WireGuard VPN")
+            self.sh_idx = [p[0] for p in pages].index("Mappamegosztás")
+            self.nav_hist, self.nav_pos = [-1], 0
+
             outer = Gtk.Box(orientation=V)
             self.add(outer)
+            outer.pack_start(self.xp_toolbar(), False, False, 0)
             body = Gtk.Box(orientation=H)
             outer.pack_start(body, True, True, 0)
-            self.side = Gtk.ListBox()
-            self.side.set_size_request(240, -1)
             self.stack = Gtk.Stack()
             self.stack.set_transition_type(Gtk.StackTransitionType.NONE)
-            pages = [("Bejelentkező ablak", self.page_login), ("Távoli segítség", self.page_remote),
-                     ("Felhő tárhely", self.page_cloud), ("Tartományba léptetés", self.page_domain),
-                     ("WireGuard VPN", self.page_wg), ("Mappamegosztás", self.page_share),
-                     ("Rendszeridő", self.page_time), ("Rendszer", self.page_system)]
-            self.page_names = []
-            self.wg_idx = [t for t, _b in pages].index("WireGuard VPN")
-            self.sh_idx = [t for t, _b in pages].index("Mappamegosztás")
-            for i, (title, builder) in enumerate(pages):
-                row = Gtk.ListBoxRow()
-                lab = Gtk.Label(label=title, xalign=0)
-                lab.set_margin_top(12)
-                lab.set_margin_bottom(12)
-                lab.set_margin_start(16)
-                row.add(lab)
-                self.side.add(row)
+            self.stack.add_named(self.home_view(), "home")
+            for i, (title, builder, kind, _desc) in enumerate(pages):
+                self._build_kind = kind
                 sw = Gtk.ScrolledWindow()
-                sw.add(builder())
+                sw.get_style_context().add_class("xp-scroll")
+                w = builder()
+                sw.add(getattr(w, "xp_root", w))
                 self.stack.add_named(sw, f"p{i}")
                 self.page_names.append(f"p{i}")
-            self.side.connect("row-selected", self.on_row)
-            body.pack_start(self.side, False, False, 0)
-            body.pack_start(Gtk.Separator(orientation=H), False, False, 0)
+            self._build_kind = None
             body.pack_start(self.stack, True, True, 0)
 
             bottom = Gtk.Box(orientation=V, spacing=4)
             bottom.set_border_width(6)
+            bottom.get_style_context().add_class("xp-status")
             self.progress = Gtk.ProgressBar()
             self.status = Gtk.Label(xalign=0)
             self.status.set_line_wrap(True)
@@ -1724,31 +1897,107 @@ def gui_main(helper=None, run=True):
             self.expander.add(lsw)
             for w in (self.progress, self.status, self.expander):
                 bottom.pack_start(w, False, False, 0)
-            outer.pack_start(Gtk.Separator(), False, False, 0)
             outer.pack_start(bottom, False, False, 0)
             self.show_all()
             self.progress.hide()
-            self.side.select_row(self.side.get_row_at_index(0))
+            self.go(-1, record=False)
             self.refresh_status()
 
-        # ---------------------------------------------------------- segédek
-        def on_row(self, _lb, row):
-            if row is not None:
-                self.stack.set_visible_child_name(self.page_names[row.get_index()])
-                if row.get_index() == self.wg_idx and not self.wg_loaded and pkg_ok("wireguard-tools"):
-                    self.wg_refresh()
-                if row.get_index() == self.sh_idx and not self.sh_loaded and pkg_ok("samba"):
-                    self.sh_refresh()
+        # ------------------------------------------------ XP-s keret: menü, eszköztár, navigáció
+        def xp_toolbar(self):
+            wrap = Gtk.Box(orientation=V)
+            bar = Gtk.Box(spacing=2)
+            bar.get_style_context().add_class("xp-toolbar")
 
+            def tb(kind, text, cb):
+                b = Gtk.Button()
+                b.set_relief(Gtk.ReliefStyle.NONE)
+                b.get_style_context().add_class("xp-tool")
+                box = Gtk.Box(spacing=5)
+                box.pack_start(xp_image(kind, 24), False, False, 0)
+                if text:
+                    box.pack_start(Gtk.Label(label=text), False, False, 0)
+                b.add(box)
+                b.connect("clicked", cb)
+                bar.pack_start(b, False, False, 0)
+                return b
+            self.b_back = tb("back", "Vissza", lambda *_: self.nav_step(-1))
+            self.b_fwd = tb("fwd", "", lambda *_: self.nav_step(1))
+            self.b_up = tb("up", "Fel", lambda *_: self.go(-1))
+            wrap.pack_start(bar, False, False, 0)
+            return wrap
+
+        def home_view(self):
+            sw = Gtk.ScrolledWindow()
+            sw.get_style_context().add_class("xp-home")
+            fb = Gtk.FlowBox()
+            fb.set_valign(Gtk.Align.START)
+            fb.set_homogeneous(True)
+            fb.set_min_children_per_line(2)
+            fb.set_max_children_per_line(6)
+            fb.set_row_spacing(6)
+            fb.set_column_spacing(6)
+            fb.set_border_width(14)
+            fb.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            fb.set_activate_on_single_click(not XP_DUPLA_KATTINTAS)
+            for title, _b, kind, desc in self.pages_meta:
+                it = Gtk.Box(orientation=V, spacing=4)
+                it.set_border_width(8)
+                it.pack_start(xp_image(kind, 48), False, False, 0)
+                l = Gtk.Label(label=title)
+                l.set_justify(Gtk.Justification.CENTER)
+                l.set_line_wrap(True)
+                l.set_max_width_chars(14)
+                it.pack_start(l, False, False, 0)
+                it.set_tooltip_text(desc)
+                fb.add(it)
+            fb.connect("child-activated", lambda _fb, ch: self.go(ch.get_index()))
+            sw.add(fb)
+            return sw
+
+        def go(self, idx, record=True):
+            if record and idx != self.nav_hist[self.nav_pos]:
+                del self.nav_hist[self.nav_pos + 1:]
+                self.nav_hist.append(idx)
+                self.nav_pos += 1
+            if idx < 0:
+                self.stack.set_visible_child_name("home")
+            else:
+                self.stack.set_visible_child_name(self.page_names[idx])
+                if idx == self.wg_idx and not self.wg_loaded and pkg_ok("wireguard-tools"):
+                    self.wg_refresh()
+                if idx == self.sh_idx and not self.sh_loaded and pkg_ok("samba"):
+                    self.sh_refresh()
+            self.b_back.set_sensitive(self.nav_pos > 0)
+            self.b_fwd.set_sensitive(self.nav_pos < len(self.nav_hist) - 1)
+            self.b_up.set_sensitive(idx >= 0)
+
+        def nav_step(self, d):
+            p = self.nav_pos + d
+            if 0 <= p < len(self.nav_hist):
+                self.nav_pos = p
+                self.go(self.nav_hist[p], record=False)
+
+        # ---------------------------------------------------------- segédek
         def mk_page(self, title, sub=""):
+            root = Gtk.Box(orientation=V)
+            hd = Gtk.Box(spacing=12)
+            hd.get_style_context().add_class("xp-pagehead")
+            kind = getattr(self, "_build_kind", None)
+            if kind:
+                hd.pack_start(xp_image(kind, 40), False, False, 0)
+            tx = Gtk.Box(orientation=V, spacing=2)
+            t = Gtk.Label(label=title, xalign=0)
+            t.get_style_context().add_class("xp-pagetitle")
+            tx.pack_start(t, False, False, 0)
+            if sub:
+                tx.pack_start(self.lab(sub), False, False, 0)
+            hd.pack_start(tx, True, True, 0)
+            root.pack_start(hd, False, False, 0)
             box = Gtk.Box(orientation=V, spacing=8)
             box.set_border_width(18)
-            t = Gtk.Label(xalign=0)
-            t.set_markup(f"<span size='x-large' weight='bold'>{title}</span>")
-            box.pack_start(t, False, False, 0)
-            if sub:
-                box.pack_start(self.lab(sub), False, False, 0)
-            box.pack_start(Gtk.Separator(), False, False, 6)
+            root.pack_start(box, True, True, 0)
+            box.xp_root = root
             return box
 
         def lab(self, text):
@@ -1759,6 +2008,7 @@ def gui_main(helper=None, run=True):
         def head(self, box, text):
             l = Gtk.Label(xalign=0)
             l.set_markup(f"<b>{text}</b>")
+            l.get_style_context().add_class("xp-head")
             l.set_margin_top(10)
             box.pack_start(l, False, False, 2)
 
