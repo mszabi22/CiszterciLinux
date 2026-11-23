@@ -338,29 +338,242 @@ def empty_ruleset():
             + tbl("raw", ("PREROUTING", "OUTPUT")))
 
 
+# ------------------------------------------------------------- XP (Luna) kinézet
+_SVG_HEAD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs>'
+             '<linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b97f5"/>'
+             '<stop offset="1" stop-color="#1a3fa8"/></linearGradient>'
+             '<linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f4ea"/>'
+             '<stop offset="1" stop-color="#b3af9c"/></linearGradient>'
+             '<linearGradient id="y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0a0"/>'
+             '<stop offset="1" stop-color="#e5b53a"/></linearGradient>'
+             '<linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ecff"/>'
+             '<stop offset="1" stop-color="#4a8fe6"/></linearGradient>'
+             '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fdc6c"/>'
+             '<stop offset="1" stop-color="#1f8f1f"/></linearGradient></defs>')
+
+XP_SVG = {
+    "login": '<rect x="3" y="5" width="42" height="30" rx="3" fill="url(#b)" stroke="#6e6a58"/>'
+             '<rect x="7" y="9" width="34" height="22" fill="url(#a)" stroke="#0b2a7a"/>'
+             '<circle cx="24" cy="17" r="5" fill="#fff"/><path d="M14 31 C14 23 34 23 34 31 Z" fill="#fff"/>'
+             '<rect x="19" y="35" width="10" height="4" fill="#a8a493"/>'
+             '<rect x="12" y="39" width="24" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>',
+    "remote": '<circle cx="24" cy="24" r="15" fill="none" stroke="#fff" stroke-width="8"/>'
+              '<circle cx="24" cy="24" r="15" fill="none" stroke="#e03a2a" stroke-width="8" '
+              'stroke-dasharray="11.78 11.78"/>'
+              '<circle cx="24" cy="24" r="19" fill="none" stroke="#7a1a1a"/>'
+              '<circle cx="24" cy="24" r="11" fill="none" stroke="#7a1a1a"/>',
+    "cloud": '<g fill="#1d4fa0" stroke="#1d4fa0" stroke-width="2.4"><circle cx="15" cy="28" r="8"/>'
+             '<circle cx="25" cy="21" r="10"/><circle cx="34" cy="28" r="8"/><rect x="15" y="28" width="19" height="8"/></g>'
+             '<g fill="url(#c)"><circle cx="15" cy="28" r="8"/><circle cx="25" cy="21" r="10"/>'
+             '<circle cx="34" cy="28" r="8"/><rect x="15" y="28" width="19" height="8"/></g>'
+             '<path d="M24 34 V22 M19 27 L24 22 L29 27" stroke="#fff" stroke-width="3" fill="none" '
+             'stroke-linecap="round" stroke-linejoin="round"/>',
+    "domain": '<path d="M24 18 V26 M12 26 H36 M12 26 V30 M36 26 V30" stroke="#5a5748" stroke-width="2" fill="none"/>'
+              '<rect x="12" y="4" width="24" height="14" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="16" y="8" width="12" height="2" fill="#6e6a58"/><rect x="16" y="12" width="12" height="2" fill="#6e6a58"/>'
+              '<circle cx="32" cy="11" r="2" fill="#3ccf3c"/>'
+              '<rect x="3" y="30" width="18" height="12" rx="1.5" fill="url(#a)" stroke="#0b2a7a"/>'
+              '<rect x="27" y="30" width="18" height="12" rx="1.5" fill="url(#a)" stroke="#0b2a7a"/>',
+    "vpn": '<path d="M24 3 L41 9 V23 C41 34 33 41 24 45 C15 41 7 34 7 23 V9 Z" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+           '<path d="M19 23 V20 A5 5 0 0 1 29 20 V23" stroke="#fff" stroke-width="3" fill="none"/>'
+           '<rect x="16" y="23" width="16" height="12" rx="2" fill="#ffd451" stroke="#a77c00"/>',
+    "share": '<path d="M4 10 H18 L21 14 H44 V40 H4 Z" fill="#e5b53a" stroke="#a77c00"/>'
+             '<path d="M4 19 H44 V40 H4 Z" fill="url(#y)" stroke="#a77c00"/>'
+             '<circle cx="36" cy="34" r="9" fill="url(#a)" stroke="#fff" stroke-width="1.5"/>'
+             '<path d="M31 34 H40 M36 30 L40 34 L36 38" stroke="#fff" stroke-width="2.5" fill="none" '
+             'stroke-linecap="round" stroke-linejoin="round"/>',
+    "time": '<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b2a7a"/>'
+            '<circle cx="24" cy="24" r="16" fill="#fff" stroke="#8a8a8a"/>'
+            '<path d="M24 10 V13 M24 35 V38 M10 24 H13 M35 24 H38" stroke="#333" stroke-width="2"/>'
+            '<path d="M24 24 V15" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>'
+            '<path d="M24 24 L32 28" stroke="#222" stroke-width="2" stroke-linecap="round"/>'
+            '<path d="M24 24 L19 31" stroke="#d22" stroke-width="1.2"/><circle cx="24" cy="24" r="2" fill="#222"/>',
+    "system": '<rect x="3" y="7" width="30" height="24" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="6" y="10" width="24" height="18" fill="url(#a)" stroke="#0b2a7a"/>'
+              '<rect x="14" y="31" width="8" height="4" fill="#a8a493"/>'
+              '<rect x="9" y="35" width="18" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="35" y="14" width="10" height="26" rx="1.5" fill="url(#b)" stroke="#6e6a58"/>'
+              '<rect x="37" y="18" width="6" height="2" fill="#6e6a58"/><circle cx="40" cy="35" r="1.5" fill="#3ccf3c"/>'
+              '<path d="M12 19 L17 24 L25 14" stroke="#fff" stroke-width="3" fill="none" '
+              'stroke-linecap="round" stroke-linejoin="round"/>',
+    "back": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+            '<path d="M27 12 L15 24 L27 36 M15 24 H37" stroke="#fff" stroke-width="5" fill="none" '
+            'stroke-linecap="round" stroke-linejoin="round"/>',
+    "fwd": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+           '<path d="M21 12 L33 24 L21 36 M33 24 H11" stroke="#fff" stroke-width="5" fill="none" '
+           'stroke-linecap="round" stroke-linejoin="round"/>',
+    "up": '<circle cx="24" cy="24" r="21" fill="url(#g)" stroke="#1d6f1d" stroke-width="2"/>'
+          '<path d="M12 27 L24 15 L36 27 M24 15 V37" stroke="#fff" stroke-width="5" fill="none" '
+          'stroke-linecap="round" stroke-linejoin="round"/>',
+}
+XP_FALLBACK_ICON = {"login": "system-users", "remote": "help-browser", "cloud": "folder-remote",
+                    "domain": "network-workgroup", "vpn": "network-vpn", "share": "folder-publicshare",
+                    "time": "preferences-system-time", "system": "computer",
+                    "back": "go-previous", "fwd": "go-next", "up": "go-up"}
+
+XP_CSS = """
+window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
+.xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
+.xp * { font-family: Tahoma, "DejaVu Sans", "Noto Sans", sans-serif; font-size: 9pt; }
+.xp .monospace, .xp textview.monospace { font-family: monospace; }
+.xp label, .xp checkbutton, .xp radiobutton { color: #000000; }
+.xp label:disabled { color: #ACA899; }
+.xp separator { background-color: #ACA899; min-height: 1px; min-width: 1px; }
+.xp scrolledwindow.xp-scroll, .xp scrolledwindow.xp-scroll viewport { background-color: #ECE9D8; }
+.xp textview text { background-color: #FFFFFF; color: #000000; }
+
+.xp button { background-image: linear-gradient(to bottom, #FFFFFF, #ECEBE5 85%, #D6D0C5);
+             background-color: #ECEBE5; border: 1px solid #003C74; border-radius: 3px;
+             padding: 3px 12px; color: #000000; box-shadow: none; text-shadow: none; min-height: 0; }
+.xp button:hover { box-shadow: inset 0 0 0 2px #FFC83C; }
+.xp button:active { background-image: linear-gradient(to bottom, #CDCAC3, #E3E3DB); box-shadow: none; }
+.xp button:disabled { color: #ACA899; border-color: #C9C7BA; background-image: none; background-color: #F4F2E8; }
+
+.xp entry, .xp spinbutton { background-color: #FFFFFF; color: #000000; border: 1px solid #7F9DB9;
+                            border-radius: 0; box-shadow: none; padding: 2px 3px; min-height: 0; }
+.xp entry:focus { border-color: #316AC5; }
+.xp frame > border { border: 1px solid #D0D0BF; border-radius: 3px; }
+
+.xp progressbar trough { background-color: #FFFFFF; border: 1px solid #686868; border-radius: 3px; min-height: 12px; }
+.xp progressbar progress { background-image: repeating-linear-gradient(to right, #37D237 0px, #37D237 7px, #FFFFFF 7px, #FFFFFF 9px);
+                           border: none; border-radius: 0; min-height: 10px; }
+
+.xp menubar { background-image: none; background-color: #ECE9D8; border-bottom: 1px solid #ACA899; }
+.xp menubar > menuitem { padding: 3px 8px; }
+.xp menubar > menuitem:hover { background-color: #316AC5; }
+.xp menubar > menuitem:hover label { color: #FFFFFF; }
+
+.xp .xp-toolbar { background-image: linear-gradient(to bottom, #F7F6EF, #ECE9D8); padding: 2px 4px;
+                  border-bottom: 1px solid #ACA899; }
+.xp button.xp-tool { background-image: none; background-color: transparent; border: 1px solid transparent;
+                     border-radius: 3px; padding: 2px 6px; box-shadow: none; }
+.xp button.xp-tool:hover { border-color: #ACA899; background-image: linear-gradient(to bottom, #FFFFFF, #E8E6DA); box-shadow: none; }
+.xp button.xp-tool:disabled { background-image: none; background-color: transparent; border-color: transparent; opacity: 0.45; }
+.xp .xp-addrrow { background-color: #ECE9D8; padding: 3px 6px; border-bottom: 1px solid #ACA899; }
+.xp .xp-addr { background-color: #FFFFFF; border: 1px solid #7F9DB9; padding: 2px 4px; }
+
+.xp .xp-left { background-image: linear-gradient(to bottom, #7BA2E7, #6375D6); padding: 12px 10px; }
+.xp .xp-tb-head { background-image: linear-gradient(to right, #FFFFFF, #C6D3F7); border-radius: 6px 6px 0px 0px; padding: 4px 8px; }
+.xp .xp-tb-head label { color: #215DC6; font-weight: bold; }
+.xp .xp-tb-body { background-color: #D6DFF7; border-style: solid; border-color: #FFFFFF; border-width: 0px 1px 1px 1px; padding: 6px 8px; }
+.xp label.xp-det-title { font-weight: bold; }
+.xp button.xp-link { background-image: none; background-color: transparent; border: none; box-shadow: none; padding: 2px 0px; }
+.xp button.xp-link:hover { background-image: none; background-color: transparent; box-shadow: none; }
+.xp button.xp-link label { color: #215DC6; }
+.xp button.xp-link:hover label { color: #428EFF; text-decoration: underline; }
+
+.xp .xp-home, .xp .xp-home viewport, .xp .xp-home flowbox { background-color: #FFFFFF; }
+.xp .xp-home flowboxchild:hover { background-color: #EAF1FB; }
+.xp .xp-home flowboxchild:selected { background-color: #316AC5; }
+.xp .xp-home flowboxchild:selected label { color: #FFFFFF; }
+
+.xp .xp-pagehead { background-image: linear-gradient(to right, #FFFFFF, #CCD9F5); border-bottom: 1px solid #7F9DB9; padding: 10px 18px; }
+.xp label.xp-pagetitle { font-size: 15pt; font-weight: bold; color: #1D3E8F; }
+.xp label.xp-head { color: #0046D5; border-bottom: 1px solid #D0D0BF; padding-bottom: 2px; }
+.xp .xp-status { background-color: #ECE9D8; border-top: 1px solid #ACA899; }
+"""
+
+
+
+XP_SVG.update({
+    "fw": '<rect x="4" y="16" width="40" height="27" fill="#c8502d" stroke="#7a2a12"/>'
+          '<path d="M4 25 H44 M4 34 H44 M16 16 V25 M30 16 V25 M10 25 V34 M23 25 V34 M36 25 V34 M16 34 V43 M30 34 V43" '
+          'stroke="#f3dccb" stroke-width="2" fill="none"/>'
+          '<path d="M24 2 C28 8 34 11 32 18 C31 21 28 22 24 22 C20 22 17 20 18 16 C19 13 22 12 22 9 C22 6 23 4 24 2 Z" '
+          'fill="#ff9a1a" stroke="#c2570a"/>'
+          '<path d="M24 11 C26 14 28 15 27 18 C26 20 22 20 21 18 C21 16 23 15 24 11 Z" fill="#ffe36a"/>',
+    "nat": '<circle cx="24" cy="24" r="19" fill="url(#a)" stroke="#0b2a7a"/>'
+           '<ellipse cx="24" cy="24" rx="8" ry="19" fill="none" stroke="#fff" stroke-width="1.5"/>'
+           '<path d="M5 24 H43 M8 14 H40 M8 34 H40" stroke="#fff" stroke-width="1.5" fill="none"/>',
+    "wipe": '<defs><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a70"/>'
+            '<stop offset="1" stop-color="#c8200f"/></linearGradient></defs>'
+            '<circle cx="24" cy="24" r="20" fill="url(#r)" stroke="#7a1208" stroke-width="1.5"/>'
+            '<path d="M16 16 L32 32 M32 16 L16 32" stroke="#fff" stroke-width="5" stroke-linecap="round"/>',
+    "save": '<path d="M5 5 H37 L43 11 V43 H5 Z" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+            '<rect x="14" y="5" width="20" height="13" fill="#dcdcd4" stroke="#7a7a70"/>'
+            '<rect x="27" y="7" width="4" height="9" fill="#555"/>'
+            '<rect x="11" y="25" width="26" height="18" fill="#fff" stroke="#9a9a9a"/>'
+            '<path d="M15 30 H33 M15 34 H33 M15 38 H27" stroke="#aab" stroke-width="1.5"/>',
+})
+XP_SVG["question"] = ('<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+                      '<path d="M17 19 C17 10 31 10 31 19 C31 25 24 25 24 31" stroke="#fff" stroke-width="5" fill="none" '
+                      'stroke-linecap="round"/><circle cx="24" cy="38" r="3" fill="#fff"/>')
+XP_SVG["refresh"] = ('<circle cx="24" cy="24" r="21" fill="#eaf6ea" stroke="#1d6f1d" stroke-width="1.5"/>'
+                     '<path d="M35 24 A11 11 0 1 1 31 15" stroke="#2a8a2a" stroke-width="5" fill="none" stroke-linecap="round"/>'
+                     '<path d="M26 8 L37 13 L31 23 Z" fill="#2a8a2a"/>')
+XP_FALLBACK_ICON.update({"fw": "security-high", "nat": "network-workgroup",
+                         "wipe": "edit-delete", "save": "document-save", "refresh": "view-refresh", "question": "dialog-question"})
+XP_CSS += """
+.xp treeview.view { background-color: #FFFFFF; color: #000000; }
+.xp treeview.view:selected { background-color: #316AC5; color: #FFFFFF; }
+.xp treeview header button { border-radius: 0px; padding: 2px 6px; border: 1px solid #ACA899;
+                             background-image: linear-gradient(to bottom, #FFFFFF, #EBEADB); box-shadow: none; }
+.xp treeview header button:hover { box-shadow: inset 0 -2px 0 0 #FFC83C; }
+.xp scrolledwindow { border: 1px solid #7F9DB9; }
+.xp button.xp-tile { background-image: none; background-color: transparent; border: 1px solid transparent;
+                     border-radius: 3px; padding: 8px 6px; box-shadow: none; }
+.xp button.xp-tile:hover { background-color: #F3F6FC; border-color: #7F9DB9; box-shadow: none; }
+"""
+
 def gui_main():
     import ipaddress
     import gi
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk, GLib, GdkPixbuf
     GLib.set_prgname("ciszterci-tuzfal")
     GLib.set_application_name("Ciszterci tűzfal")
     Gtk.Window.set_default_icon_name("ciszterci-tuzfal")
 
+    def xp_image(kind, size):
+        """XP-szerű ikon (beágyazott SVG); ha az SVG-betöltő hiányzik, a téma ikonja."""
+        svg = _SVG_HEAD + XP_SVG.get(kind, "") + "</svg>"
+        try:
+            ld = GdkPixbuf.PixbufLoader.new_with_type("svg")
+            ld.set_size(size, size)
+            ld.write(svg.encode("utf-8"))
+            ld.close()
+            return Gtk.Image.new_from_pixbuf(ld.get_pixbuf())
+        except Exception:
+            return Gtk.Image.new_from_icon_name(XP_FALLBACK_ICON.get(kind, "image-missing"), Gtk.IconSize.DIALOG)
+
+    def xp_apply_css():
+        from gi.repository import Gdk
+        try:   # sötét rendszertéma mellett is a világos változat (az ablakok egységes megjelenéséért)
+            Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", False)
+        except Exception:
+            pass
+        prov = Gtk.CssProvider()
+        try:
+            prov.load_from_data(XP_CSS.encode("utf-8"))
+        except GLib.Error as e:
+            print("XP-stílus betöltési hiba:", e.message, file=sys.stderr)
+            return
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
     class App(Gtk.Window):
         def __init__(self):
             super().__init__(title="Ciszterci tűzfal")
-            self.set_default_size(680, 580)
+            self.set_default_size(680, 680)
             self.connect("destroy", Gtk.main_quit)
             self.h = Helper()
             self.rules, self.policy = {}, {}
 
             root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             root.set_border_width(8)
+            self.get_style_context().add_class("xp")
+            xp_apply_css()
+            outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            outer.pack_start(self.xp_toolbar(), False, False, 0)
             self.stack = Gtk.Stack()
+            adv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            adv.pack_start(self.xp_banner("fw", "Haladó beállítások", "iptables láncok, szabályok és NAT"),
+                           False, False, 0)
+            adv.pack_start(root, True, True, 0)
             self.stack.add_named(self.build_simple(), "egyszeru")
-            self.stack.add_named(root, "halado")
-            self.add(self.stack)
+            self.stack.add_named(adv, "halado")
+            outer.pack_start(self.stack, True, True, 0)
+            self.add(outer)
 
             # felső sor
             top = Gtk.Box(spacing=6)
@@ -378,21 +591,26 @@ def gui_main():
                 top.pack_start(w, False, False, 0)
             self.fam.connect("changed", lambda *_: self.refresh())
             self.tab.connect("changed", lambda *_: self.refresh())
-            for text, cb in (("Frissítés", lambda *_: self.refresh()),
-                             ("Mentés lemezre (perzisztens)", self.on_save),
-                             ("← Egyszerű nézet", lambda *_: self.show_mode(False))):
-                b = Gtk.Button(label=text)
-                b.connect("clicked", cb)
-                top.pack_start(b, False, False, 0)
-
-            row2 = Gtk.Box(spacing=6)
-            row2.pack_start(Gtk.Label(label="Gyorsműveletek:"), False, False, 0)
-            for text, cb in (("Alapértelmezett desktop sablon", self.on_template),
-                             ("NAT: internetmegosztás", self.on_nat_masq),
-                             ("NAT: port továbbítás", self.on_nat_dnat),
-                             ("NAT: SNAT", self.on_nat_snat),
-                             ("Összes szabály törlése", self.on_wipe)):
-                b = Gtk.Button(label=text)
+            row2 = Gtk.Box(spacing=4)
+            row2.get_style_context().add_class("xp-toolbar")
+            for kind, text, cb in (("refresh", "Frissítés", lambda *_: self.refresh()),
+                                   ("save", "Mentés lemezre", self.on_save),
+                                   ("fw", "Alapértelmezett desktop sablon", self.on_template),
+                                   ("nat", "NAT: internetmegosztás", self.on_nat_masq),
+                                   ("fwd", "NAT: port továbbítás", self.on_nat_dnat),
+                                   ("domain", "NAT: SNAT", self.on_nat_snat),
+                                   ("wipe", "Összes szabály törlése", self.on_wipe)):
+                b = Gtk.Button()
+                b.set_relief(Gtk.ReliefStyle.NONE)
+                b.get_style_context().add_class("xp-tile")
+                v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+                v.pack_start(xp_image(kind, 32), False, False, 0)
+                l = Gtk.Label(label=text)
+                l.set_justify(Gtk.Justification.CENTER)
+                l.set_line_wrap(True)
+                l.set_max_width_chars(13)
+                v.pack_start(l, False, False, 0)
+                b.add(v)
                 b.connect("clicked", cb)
                 row2.pack_start(b, False, False, 0)
             root.pack_start(row2, False, False, 0)
@@ -463,8 +681,49 @@ def gui_main():
 
             self.show_all()
             self.stack.set_visible_child_name("egyszeru")
+            self.nav_state(False)
             self.refresh()
             self.refresh_simple()
+
+        # -------- XP-s keret: eszköztár, fejléc
+        def xp_toolbar(self):
+            bar = Gtk.Box(spacing=2)
+            bar.get_style_context().add_class("xp-toolbar")
+
+            def tb(kind, text, cb):
+                b = Gtk.Button()
+                b.set_relief(Gtk.ReliefStyle.NONE)
+                b.get_style_context().add_class("xp-tool")
+                box = Gtk.Box(spacing=5)
+                box.pack_start(xp_image(kind, 24), False, False, 0)
+                box.pack_start(Gtk.Label(label=text), False, False, 0)
+                b.add(box)
+                b.connect("clicked", cb)
+                bar.pack_start(b, False, False, 0)
+                return b
+            self.b_back = tb("back", "Vissza", lambda *_: self.show_mode(False))
+            self.b_fwd = tb("fwd", "Haladó beállítások", lambda *_: self.show_mode(True))
+            return bar
+
+        def xp_banner(self, kind, title, sub):
+            hd = Gtk.Box(spacing=12)
+            hd.get_style_context().add_class("xp-pagehead")
+            hd.pack_start(xp_image(kind, 40), False, False, 0)
+            tx = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            t = Gtk.Label(label=title, xalign=0)
+            t.get_style_context().add_class("xp-pagetitle")
+            t.set_line_wrap(True)
+            tx.pack_start(t, False, False, 0)
+            if sub:
+                s = Gtk.Label(label=sub, xalign=0)
+                s.set_line_wrap(True)
+                tx.pack_start(s, False, False, 0)
+            hd.pack_start(tx, True, True, 0)
+            return hd
+
+        def nav_state(self, advanced):
+            self.b_back.set_sensitive(advanced)
+            self.b_fwd.set_sensitive(not advanced)
 
         # -------- segédek
         def tool(self):
@@ -484,9 +743,21 @@ def gui_main():
             self.sstatus.set_text(t)
 
         def confirm(self, text):
-            d = Gtk.MessageDialog(transient_for=self, modal=True,
-                                  message_type=Gtk.MessageType.QUESTION,
-                                  buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+            d = Gtk.Dialog(title="Megerősítés", transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "OK", Gtk.ResponseType.OK)
+            d.set_default_response(Gtk.ResponseType.OK)
+            d.get_action_area().set_border_width(8)
+            area = d.get_content_area()
+            area.set_spacing(0)
+            area.pack_start(self.xp_banner("question", "Megerősítés", ""), False, False, 0)
+            l = Gtk.Label(label=text, xalign=0)
+            l.set_line_wrap(True)
+            l.set_max_width_chars(52)
+            for m in ("top", "bottom", "start", "end"):
+                getattr(l, f"set_margin_{m}")(18)
+            area.pack_start(l, True, True, 0)
+            d.show_all()
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             return ok
@@ -494,10 +765,17 @@ def gui_main():
         def ask(self, title, fields):
             """fields: [(felirat, alapérték | [opciók])]. Visszatér: [értékek] vagy None."""
             d = Gtk.Dialog(title=title, transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
             d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "OK", Gtk.ResponseType.OK)
-            g = Gtk.Grid(column_spacing=8, row_spacing=6)
-            g.set_border_width(10)
-            d.get_content_area().add(g)
+            d.get_action_area().set_border_width(8)
+            area = d.get_content_area()
+            area.set_spacing(0)
+            area.pack_start(self.xp_banner("nat" if "NAT" in title else "fw", title,
+                                           "Töltsd ki a mezőket, majd nyomd meg az OK gombot."),
+                            False, False, 0)
+            g = Gtk.Grid(column_spacing=8, row_spacing=8)
+            g.set_border_width(18)
+            area.pack_start(g, True, True, 0)
             widgets = []
             for i, (label, val) in enumerate(fields):
                 g.attach(Gtk.Label(label=label, xalign=1), 0, i, 1, 1)
@@ -863,8 +1141,12 @@ def gui_main():
             return lambda *_: (f(), self.refresh_simple())
 
         def build_simple(self):
+            page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            page.pack_start(self.xp_banner("fw", "Ciszterci tűzfal", "A bejövő forgalom egyszerű védelme"),
+                            False, False, 0)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             box.set_border_width(16)
+            page.pack_start(box, True, True, 0)
             self.state = Gtk.Label(xalign=0)
             self.state.set_use_markup(True)
             self.state.set_line_wrap(True)
@@ -887,30 +1169,40 @@ def gui_main():
                 prow.pack_start(b, False, False, 0)
             box.pack_start(prow, False, False, 0)
             box.pack_start(Gtk.Separator(), False, False, 4)
-            for text, cb in (("Védelem bekapcsolása (ajánlott alapbeállítás)", self.on_template),
-                             ("Internetmegosztás más gépeknek (NAT)", self.on_nat_masq),
-                             ("Összes szabály törlése (tűzfal kikapcsolása)", self.on_wipe),
-                             ("Mentés (újraindítás után is megmarad)", self.on_save_both)):
-                b = Gtk.Button(label=text)
+            tiles = Gtk.Box(spacing=6, homogeneous=True)
+            for kind, text, cb in (("fw", "Védelem bekapcsolása (ajánlott alapbeállítás)", self.on_template),
+                                   ("nat", "Internetmegosztás más gépeknek (NAT)", self.on_nat_masq),
+                                   ("wipe", "Összes szabály törlése (tűzfal kikapcsolása)", self.on_wipe),
+                                   ("save", "Mentés (újraindítás után is megmarad)", self.on_save_both)):
+                b = Gtk.Button()
+                b.set_relief(Gtk.ReliefStyle.NONE)
+                b.get_style_context().add_class("xp-tile")
+                v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                v.pack_start(xp_image(kind, 40), False, False, 0)
+                l = Gtk.Label(label=text)
+                l.set_justify(Gtk.Justification.CENTER)
+                l.set_line_wrap(True)
+                l.set_max_width_chars(16)
+                v.pack_start(l, False, False, 0)
+                b.add(v)
                 b.connect("clicked", self.then(cb))
-                box.pack_start(b, False, False, 0)
-            adv = Gtk.Button(label="Haladó beállítások…")
-            adv.connect("clicked", lambda *_: self.show_mode(True))
-            box.pack_start(adv, False, False, 0)
+                tiles.pack_start(b, True, True, 0)
+            box.pack_start(tiles, False, False, 0)
             self.sstatus = Gtk.Label(xalign=0)
             self.sstatus.set_line_wrap(True)
             box.pack_start(self.sstatus, False, False, 0)
-            return box
+            return page
 
         def show_mode(self, advanced):
+            self.nav_state(advanced)
             if advanced:
                 self.refresh()
                 self.stack.set_visible_child_name("halado")
-                self.resize(1050, 620)
+                self.resize(1050, 740)
             else:
                 self.refresh_simple()
                 self.stack.set_visible_child_name("egyszeru")
-                self.resize(680, 580)
+                self.resize(680, 680)
 
         def refresh_simple(self):
             prot, ports, ok = {}, [], True
