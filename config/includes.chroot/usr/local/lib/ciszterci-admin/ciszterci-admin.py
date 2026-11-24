@@ -2481,12 +2481,32 @@ def gui_main(helper=None, run=True):
         except Exception:
             return Gtk.Image.new_from_icon_name(XP_FALLBACK_ICON.get(kind, "image-missing"), Gtk.IconSize.DIALOG)
 
+    def xp_mark_dialogs():
+        for w in Gtk.Window.list_toplevels():
+            if isinstance(w, Gtk.Dialog):
+                sc = w.get_style_context()
+                if not sc.has_class("xp"):
+                    sc.add_class("xp")
+        return True
+
     def xp_apply_css():
         from gi.repository import Gdk
-        try:   # sötét rendszertéma mellett is a világos változat (egységes megjelenés)
-            Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", False)
+        try:   # sötét rendszertéma mellett is világos ablakok (főablak és párbeszédablakok egységesen)
+            st = Gtk.Settings.get_default()
+            st.set_property("gtk-application-prefer-dark-theme", False)
+            env = os.environ.get("GTK_THEME", "")
+            name = st.get_property("gtk-theme-name") or ""
+            if re.search(r"dark", env + " " + name, re.I):
+                cur = env.split(":")[0] if re.search(r"dark", env, re.I) else name
+                base = re.sub(r"[-_ ]?dark(er)?", "", cur, flags=re.I).strip("-_ ") or "Adwaita"
+                known = [os.path.expanduser("~/.themes"), os.path.expanduser("~/.local/share/themes"),
+                         "/usr/share/themes", "/usr/local/share/themes"]
+                if base != "Adwaita" and not any(os.path.isdir(os.path.join(d, base)) for d in known):
+                    base = "Adwaita"
+                st.set_property("gtk-theme-name", base)
         except Exception:
             pass
+        GLib.timeout_add(50, xp_mark_dialogs)       # minden később megnyíló párbeszédablak megkapja a stílust
         prov = Gtk.CssProvider()
         try:
             prov.load_from_data(XP_CSS.encode("utf-8"))
