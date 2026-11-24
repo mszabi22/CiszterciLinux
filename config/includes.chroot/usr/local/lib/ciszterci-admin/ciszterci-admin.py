@@ -465,7 +465,8 @@ def op_login(r):
     return "Mentve. A változás a következő bejelentkező képernyőnél lép életbe (kijelentkezés után)."
 
 
-PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer"}
+PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
+                 "xfce4-settings"}
 
 
 def op_pkg(r):
@@ -1972,6 +1973,121 @@ def op_user_delete(r):
     return f"A(z) {name} felhasználó eltávolítva.", us_collect()
 
 
+# ------------------------------------------------------------ önfrissítés (GitHub)
+UPDATE_URL = "https://github.com/mszabi22/CiszterciLinux/blob/main/config/includes.chroot/usr/local/lib/ciszterci-admin/ciszterci-admin.py"
+UPDATE_RAW = re.sub(r"^https://github\.com/([^/]+)/([^/]+)/blob/", r"https://raw.githubusercontent.com/\1/\2/", UPDATE_URL)
+UPDATE_MAX = 8_000_000
+
+
+def up_fetch(url=None):
+    """A script letöltése (csak HTTPS, csak a raw.githubusercontent.com tárolóról)."""
+    url = url or UPDATE_RAW
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or parts.hostname != "raw.githubusercontent.com":
+        raise RuntimeError("A frissítés csak a GitHub (raw.githubusercontent.com) HTTPS-címéről tölthető le.")
+    req = urllib.request.Request(url, headers={"User-Agent": APP_NAME + "-updater", "Cache-Control": "no-cache"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = r.read(UPDATE_MAX + 1)
+    if len(data) > UPDATE_MAX:
+        raise RuntimeError("A letöltött fájl gyanúsan nagy, nem fogadom el.")
+    return data
+
+
+def up_validate(data):
+    """Épségellenőrzés telepítés előtt: érvényes Python, és tényleg ennek a programnak a scriptje."""
+    try:
+        text = data.decode("utf-8")
+        compile(text, "<frissítés>", "exec")
+    except (UnicodeDecodeError, SyntaxError, ValueError) as e:
+        raise RuntimeError(f"A letöltött fájl nem érvényes Python-script: {e}")
+    m = re.search(r'^LIBDIR = "/usr/local/lib/([^"]+)"', text, re.M)
+    if not m or m.group(1) != APP_NAME:
+        raise RuntimeError(f"A letöltött fájl nem a(z) {APP_NAME} scriptje, ezért nem telepítem.")
+    for marker in ("def helper_main", "def install_main", 'if __name__ == "__main__":'):
+        if marker not in text:
+            raise RuntimeError("A letöltött fájlból hiányzik egy alapvető rész, ezért nem telepítem.")
+    return text
+
+
+def up_diffstat(old, new):
+    """(hozzáadott, törölt) sorok száma; old = None, ha nincs telepített példány."""
+    if old is None:
+        return None
+    import difflib
+    add = rem = 0
+    for line in difflib.unified_diff(old.decode("utf-8", "replace").splitlines(),
+                                     new.decode("utf-8", "replace").splitlines(), lineterm="", n=0):
+        if line.startswith("+") and not line.startswith("+++"):
+            add += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            rem += 1
+    return add, rem
+
+
+def up_read_installed():
+    try:
+        with open(INSTALL_PATH, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def up_install(data, keep_prev=True):
+    """Az új script telepítése: a saját telepítője fut le, siker esetén ellenőrzés, hiba esetén visszaállítás."""
+    import tempfile
+    sha = hashlib.sha256(data).hexdigest()
+    prev = INSTALL_PATH + ".prev"
+    old = up_read_installed()
+    tmpdir = tempfile.mkdtemp(prefix="admin-update-")
+    try:
+        os.chmod(tmpdir, 0o700)
+        new = os.path.join(tmpdir, os.path.basename(INSTALL_PATH))
+        with open(new, "wb") as f:
+            f.write(data)
+        os.chmod(new, 0o755)
+        if keep_prev and old is not None:
+            with open(prev + ".tmp", "wb") as f:
+                f.write(old)
+            os.replace(prev + ".tmp", prev)
+        rc = hrun(["/usr/bin/python3", new, "--install", new], check=False)
+        cur = up_read_installed()
+        if rc != 0 or cur is None or hashlib.sha256(cur).hexdigest() != sha:
+            if old is not None:
+                with open(INSTALL_PATH + ".restore", "wb") as f:
+                    f.write(old)
+                os.chmod(INSTALL_PATH + ".restore", 0o755)
+                os.replace(INSTALL_PATH + ".restore", INSTALL_PATH)
+            raise RuntimeError("A telepítés nem sikerült, a korábbi verziót visszaállítottam (részletek a naplóban).")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return sha
+
+
+def op_self_update(r):
+    data = up_fetch()
+    sha = hashlib.sha256(data).hexdigest()
+    exp = r.get("sha256")
+    if exp and exp != sha:
+        raise RuntimeError("A GitHubon közben megváltozott a fájl: nem azt telepíteném, amit megerősítettél. "
+                           "Keress újra frissítést.")
+    up_validate(data)
+    hlog(f"Letöltve: {len(data)} bájt, SHA-256: {sha}")
+    up_install(data)
+    return f"A(z) {APP_TITLE} frissítve (SHA-256: {sha[:12]}…). Az előző verzió mentve maradt."
+
+
+def op_self_rollback(r):
+    prev = INSTALL_PATH + ".prev"
+    try:
+        with open(prev, "rb") as f:
+            data = f.read()
+    except OSError:
+        raise RuntimeError("Nincs mentett előző verzió.")
+    up_validate(data)
+    up_install(data, keep_prev=False)
+    return "Az előző verzió visszaállítva."
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
@@ -1983,7 +2099,8 @@ OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremov
        "pm_refresh": op_pm_refresh, "pm_upgrade": op_pm_upgrade, "pm_install": op_pm_install,
        "pm_remove": op_pm_remove, "pm_cleanup": op_pm_cleanup, "pm_flatpak_setup": op_pm_flatpak_setup,
        "user_list": op_user_list, "user_add": op_user_add, "user_edit": op_user_edit,
-       "user_delete": op_user_delete}
+       "user_delete": op_user_delete,
+       "self_update": op_self_update, "self_rollback": op_self_rollback}
 
 
 def helper_main():
@@ -2000,6 +2117,7 @@ def helper_main():
 
 
 VPN_OPS = ("wg_list", "wg_up", "wg_down")
+FRESH_AUTH_OPS = ("login", "self_update", "self_rollback")      # ezeknél a művelet mindig új hitelesítést kér (nem használja a már hitelesített segédet)
 
 
 def vpn_helper_main():
@@ -2025,6 +2143,19 @@ class Helper:
         if self.p is None or self.p.poll() is not None:
             self.p = subprocess.Popen(self.cmd,
                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf-8")
+
+    def close(self):
+        """A segédfolyamat leállítása: a következő hívás új hitelesítést kér."""
+        p, self.p = self.p, None
+        if p is not None and p.poll() is None:
+            try:
+                p.stdin.close()
+            except OSError:
+                pass
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.terminate()
 
     def call(self, req, on_log=None):
         self.data = None
@@ -2074,6 +2205,42 @@ def vpn_direct():
         return False
     return ((u.pw_name in g.gr_mem or u.pw_gid == g.gr_gid)
             and os.path.exists(VPN_HELPER) and os.path.exists(POLKIT_POLICY))
+
+
+KJ_TOOLS = ("xfce4-display-settings", "arandr", "lxrandr")
+
+
+def kj_tool():
+    for t in KJ_TOOLS:
+        if shutil.which(t):
+            return t
+    return None
+
+
+def kj_summary():
+    """A csatlakoztatott kijelzők jelenlegi állapota (xrandr). None: nem olvasható."""
+    try:
+        p = subprocess.run(["xrandr", "--query"], capture_output=True, text=True, timeout=5)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if p.returncode != 0:
+        return None
+    res, cur = [], None
+    for line in p.stdout.splitlines():
+        m = re.match(r"^(\S+) (connected|disconnected)(?: (primary))?(?: (\d+x\d+)\+(-?\d+)\+(-?\d+))?", line)
+        if m:
+            cur = None
+            if m.group(2) == "connected":
+                cur = {"name": m.group(1), "primary": bool(m.group(3)), "mode": m.group(4), "rate": ""}
+                res.append(cur)
+            continue
+        if cur and cur["mode"]:
+            mm = re.match(r"^\s+(\d+x\d+)i?\s+(.*)$", line)
+            if mm and mm.group(1) == cur["mode"]:
+                r = re.search(r"([\d.]+)\*", mm.group(2))
+                if r:
+                    cur["rate"] = r.group(1)
+    return res
 
 
 def svc_active(name):
@@ -2200,6 +2367,20 @@ XP_SVG["printer"] = ('<rect x="12" y="5" width="24" height="16" fill="#fff" stro
                     '<path d="M16 35 H32 M16 38.5 H27" stroke="#aab" stroke-width="1.5"/>'
                     '<circle cx="38" cy="25" r="2" fill="#3ccf3c"/>')
 XP_FALLBACK_ICON["printer"] = "printer"
+XP_SVG["display"] = ('<rect x="7" y="5" width="34" height="24" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+                     '<rect x="10" y="8" width="28" height="18" fill="url(#a)" stroke="#0b2a7a"/>'
+                     '<path d="M10 26 L19 15 L25 21 L30 17 L38 26 Z" fill="#7fd36a"/>'
+                     '<circle cx="32" cy="13" r="2.5" fill="#ffe36a"/>'
+                     '<rect x="20" y="29" width="8" height="5" fill="#a8a493"/>'
+                     '<rect x="13" y="34" width="22" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>')
+XP_FALLBACK_ICON["display"] = "video-display"
+XP_SVG["update"] = ('<circle cx="22" cy="22" r="18" fill="url(#a)" stroke="#0b2a7a"/>'
+                    '<ellipse cx="22" cy="22" rx="7" ry="18" fill="none" stroke="#fff" stroke-width="1.5"/>'
+                    '<path d="M4 22 H40 M7 13 H37 M7 31 H37" stroke="#fff" stroke-width="1.5" fill="none"/>'
+                    '<circle cx="36" cy="36" r="10" fill="url(#g)" stroke="#1d6f1d" stroke-width="1.5"/>'
+                    '<path d="M36 41 V31 M31 36 L36 31 L41 36" stroke="#fff" stroke-width="3" fill="none" '
+                    'stroke-linecap="round" stroke-linejoin="round"/>')
+XP_FALLBACK_ICON["update"] = "software-update-available"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2351,6 +2532,10 @@ def gui_main(helper=None, run=True):
                  "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
                 ("Csomagkezelő", self.page_pkg, "pkg",
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Kijelző", self.page_display, "display",
+                 "A képernyő beállítása: felbontás, képfrissítés, tájolás, több monitor (kijelzőbeállító)."),
+                ("Vezérlőpult frissítése", self.page_update, "update",
+                 "A program legújabb verziójának letöltése a GitHubról és telepítése (visszaállítható)."),
                 ("Nyomtatók", self.page_printers, "printer",
                  "Nyomtatók hozzáadása, eltávolítása és beállítása (system-config-printer)."),
                 ("Felhasználók", self.page_users, "users",
@@ -2559,9 +2744,14 @@ def gui_main(helper=None, run=True):
             def worker():
                 rc, msg, data = 0, "", None
                 for op, params in steps:
-                    h = self.hv if (self.hv and op in VPN_OPS) else self.h
-                    rc, msg = h.call(dict(params, op=op), on_log=lambda m: GLib.idle_add(self.log, m))
-                    data = h.data
+                    fresh = op in FRESH_AUTH_OPS and not self.helper_injected
+                    h = Helper() if fresh else (self.hv if (self.hv and op in VPN_OPS) else self.h)
+                    try:
+                        rc, msg = h.call(dict(params, op=op), on_log=lambda m: GLib.idle_add(self.log, m))
+                        data = h.data
+                    finally:
+                        if fresh:
+                            h.close()
                     if rc != 0:
                         break
                 GLib.idle_add(self.task_done, rc, msg, cb, data)
@@ -2663,6 +2853,14 @@ def gui_main(helper=None, run=True):
                               else '<span foreground="#b45309">○ nincs telepítve</span>')
                 bi.set_sensitive(not ok)
                 br.set_sensitive(ok)
+            if hasattr(self, "up_inst"):
+                self.up_show_installed()
+            if hasattr(self, "kj_btn"):
+                tool = kj_tool()
+                self.kj_btn.set_sensitive(bool(tool))
+                self.kj_inst.set_sensitive(not tool)
+                self.kj_hint.set_text(f"A megnyitandó program: {tool}." if tool else
+                                      "⚠ Nincs kijelzőbeállító program telepítve: telepítsd az alábbi gombbal.")
             if hasattr(self, "pr_btn"):
                 ok = pkg_ok("system-config-printer")
                 self.pr_btn.set_sensitive(ok)
@@ -3441,6 +3639,170 @@ def gui_main(helper=None, run=True):
                 return
             self.say(0, "A nyomtatókezelő megnyílt (a módosításokhoz a program maga kér jelszót).")
 
+        # ------------------------------------------------ Kijelző (xfce4-display-settings)
+        def page_display(self):
+            b = self.mk_page("Kijelző",
+                             "A képernyő beállítása: felbontás, képfrissítés, tájolás, több monitor elrendezése "
+                             "a kijelzőkezelő programmal.")
+            self.head(b, "Jelenlegi állapot")
+            self.kj_lbl = self.lab("")
+            b.pack_start(self.kj_lbl, False, False, 0)
+            self.head(b, "Beállítás")
+            self.kj_hint = self.lab("")
+            b.pack_start(self.kj_hint, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.kj_btn = self.btn("Kijelzőbeállítások megnyitása", self.kj_open)
+            self.kj_refresh = self.btn("Állapot frissítése", lambda *_: self.kj_update())
+            self.kj_inst = self.btn("Kijelzőbeállító telepítése",
+                                    lambda *_: self.run_task([("pkg", {"action": "install", "pkgs": ["xfce4-settings"]})]))
+            for w in (self.kj_btn, self.kj_refresh, self.kj_inst):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.kj_update()
+            return b
+
+        def kj_update(self):
+            info = kj_summary()
+            if info is None:
+                text = "A kijelzők adatai nem olvashatók (az xrandr hiányzik, vagy nincs grafikus munkamenet)."
+            elif not info:
+                text = "Nincs csatlakoztatott kijelző."
+            else:
+                lines = []
+                for d in info:
+                    st = (f"{d['mode']}" + (f", {d['rate']} Hz" if d["rate"] else "")) if d["mode"] else "kikapcsolva"
+                    lines.append(f"{d['name']}{' (elsődleges)' if d['primary'] else ''}: {st}")
+                text = "\n".join(lines)
+            self.kj_lbl.set_text(text)
+
+        def kj_open(self, *_):
+            exe = kj_tool()
+            if not exe:
+                self.say(1, "Nincs kijelzőbeállító program telepítve: előbb telepítsd.")
+                return
+            try:
+                subprocess.Popen([exe], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A kijelzőbeállító nem indítható: {e}")
+                return
+            self.say(0, "A kijelzőbeállító megnyílt. A módosítás után az „Állapot frissítése” gombbal ellenőrizheted.")
+
+        # ------------------------------------------------ Vezérlőpult frissítése (GitHub)
+        def page_update(self):
+            from gi.repository import Pango
+            b = self.mk_page("Vezérlőpult frissítése",
+                             f"A(z) {APP_TITLE} legújabb verziójának letöltése a GitHubról és telepítése a rendszerbe.")
+            self.head(b, "Telepített példány")
+            self.up_inst = self.lab("")
+            b.pack_start(self.up_inst, False, False, 0)
+            self.head(b, "Forrás (GitHub)")
+            src = Gtk.Label(label=UPDATE_URL, xalign=0)
+            src.set_line_wrap(True)
+            src.set_line_wrap_mode(Pango.WrapMode.CHAR)
+            src.set_selectable(True)
+            b.pack_start(src, False, False, 0)
+            self.up_state = self.lab("")
+            b.pack_start(self.up_state, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.up_b_check = self.btn("Frissítések keresése", self.up_check)
+            self.up_b_go = self.btn("Frissítés és telepítés", self.up_go)
+            self.up_b_rb = self.btn("Visszaállítás az előző verzióra", self.up_rollback)
+            self.up_b_go.set_sensitive(False)
+            for w in (self.up_b_check, self.up_b_go, self.up_b_rb):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            b.pack_start(self.lab("A telepítés és a visszaállítás mindig rendszergazdai hitelesítést kér. A telepítés "
+                                  "előtt a program ellenőrzi, hogy a letöltött fájl érvényes, és ehhez az "
+                                  "alkalmazáshoz tartozik. A korábbi verzió mentve marad."), False, False, 0)
+            self.up_new = None
+            self.up_show_installed()
+            return b
+
+        def up_show_installed(self):
+            data = up_read_installed()
+            if data is None:
+                self.up_inst.set_text(f"A program nincs telepítve a rendszerbe ({INSTALL_PATH}).")
+                self.up_b_rb.set_sensitive(False)
+                return
+            try:
+                when = datetime.datetime.fromtimestamp(os.path.getmtime(INSTALL_PATH)).strftime("%Y.%m.%d. %H:%M")
+            except OSError:
+                when = "?"
+            has_prev = os.path.exists(INSTALL_PATH + ".prev")
+            self.up_inst.set_text(f"{INSTALL_PATH}\n{len(data) // 1024} kB, módosítva: {when}, "
+                                  f"SHA-256: {hashlib.sha256(data).hexdigest()[:12]}…"
+                                  + ("\nVan mentett előző verzió." if has_prev else ""))
+            self.up_b_rb.set_sensitive(has_prev)
+
+        def up_check(self, *_):
+            self.up_state.set_text("Keresés a GitHubon…")
+            self.up_b_check.set_sensitive(False)
+            self.up_b_go.set_sensitive(False)
+
+            def worker():
+                try:
+                    data = up_fetch()
+                    up_validate(data)
+                    res = (hashlib.sha256(data).hexdigest(), up_diffstat(up_read_installed(), data), len(data), None)
+                except Exception as e:  # noqa: BLE001
+                    res = (None, None, 0, str(e))
+                GLib.idle_add(self.up_checked, res)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def up_checked(self, res):
+            sha, stat, size, err = res
+            self.up_b_check.set_sensitive(True)
+            self.up_new = None
+            if err:
+                self.up_state.set_text(f"⚠ A frissítés keresése nem sikerült: {err}")
+                return False
+            cur = up_read_installed()
+            if cur is not None and hashlib.sha256(cur).hexdigest() == sha:
+                self.up_state.set_text("✔ A telepített verzió megegyezik a GitHubon lévővel, naprakész.")
+                return False
+            self.up_new = sha
+            extra = f" (+{stat[0]} / −{stat[1]} sor a telepítetthez képest)" if stat else ""
+            self.up_state.set_text(f"⬆ Új verzió érhető el a GitHubon: {size // 1024} kB, "
+                                   f"SHA-256: {sha[:12]}…{extra}")
+            self.up_b_go.set_sensitive(True)
+            return False
+
+        def up_go(self, *_):
+            if not self.up_new:
+                return
+            if self.confirm(f"Letöltöm és telepítem a(z) {APP_TITLE} új verzióját a GitHubról?\n\n"
+                            f"Ellenőrző összeg (SHA-256): {self.up_new[:16]}…\n\n"
+                            "A régi verzió mentve marad, így visszaállítható. A telepítés rendszergazdai "
+                            "hitelesítést kér."):
+                self.run_task([("self_update", {"sha256": self.up_new})], self.up_after)
+
+        def up_rollback(self, *_):
+            if self.confirm("Visszaállítod a program előző (mentett) verzióját?"):
+                self.run_task([("self_rollback", {})], self.up_after)
+
+        def up_after(self, rc, msg, data):
+            self.up_show_installed()
+            if rc != 0:
+                return
+            self.up_new = None
+            self.up_b_go.set_sensitive(False)
+            self.up_state.set_text("✔ " + msg)
+            if self.confirm("A telepítés kész. Újraindítsam most a programot az új verzióval?"):
+                GLib.idle_add(self.up_restart)
+
+        def up_restart(self):
+            for h in (self.h, self.hv):
+                try:
+                    if h:
+                        h.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            try:
+                os.execv(sys.executable, [sys.executable, INSTALL_PATH] + sys.argv[1:])
+            except OSError as e:
+                self.say(1, f"Az újraindítás nem sikerült: {e}")
+            return False
+
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
             b = self.mk_page("Bejelentkező ablak beállítása",
@@ -3455,6 +3817,8 @@ def gui_main(helper=None, run=True):
             ap = self.btn("Alkalmaz", self.apply_login)
             ap.set_halign(Gtk.Align.START)
             b.pack_start(ap, False, False, 0)
+            b.pack_start(self.lab("A módosítás alkalmazásához mindig rendszergazdai hitelesítés szükséges."),
+                         False, False, 0)
 
             self.head(b, "Felhasználók")
             self.c_hide = Gtk.CheckButton(label="Felhasználónevek elrejtése (a nevet be kell gépelni)")
