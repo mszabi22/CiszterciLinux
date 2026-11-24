@@ -465,7 +465,7 @@ def op_login(r):
     return "Mentve. A változás a következő bejelentkező képernyőnél lép életbe (kijelentkezés után)."
 
 
-PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba"}
+PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer"}
 
 
 def op_pkg(r):
@@ -2193,6 +2193,13 @@ XP_SVG["question"] = ('<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b
                       'stroke-linecap="round"/><circle cx="24" cy="38" r="3" fill="#fff"/>')
 XP_FALLBACK_ICON["users"] = "system-users"
 XP_FALLBACK_ICON["question"] = "dialog-question"
+XP_SVG["printer"] = ('<rect x="12" y="5" width="24" height="16" fill="#fff" stroke="#8a8a8a"/>'
+                    '<path d="M17 10 H31 M17 14 H31" stroke="#aab" stroke-width="1.5"/>'
+                    '<path d="M4 20 H44 V35 H4 Z" fill="url(#b)" stroke="#6e6a58" stroke-linejoin="round"/>'
+                    '<rect x="11" y="30" width="26" height="13" fill="#fff" stroke="#8a8a8a"/>'
+                    '<path d="M16 35 H32 M16 38.5 H27" stroke="#aab" stroke-width="1.5"/>'
+                    '<circle cx="38" cy="25" r="2" fill="#3ccf3c"/>')
+XP_FALLBACK_ICON["printer"] = "printer"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2344,6 +2351,8 @@ def gui_main(helper=None, run=True):
                  "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
                 ("Csomagkezelő", self.page_pkg, "pkg",
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Nyomtatók", self.page_printers, "printer",
+                 "Nyomtatók hozzáadása, eltávolítása és beállítása (system-config-printer)."),
                 ("Felhasználók", self.page_users, "users",
                  "Helyi felhasználói fiókok: hozzáadás, eltávolítás, csoporttagságok és tulajdonságok szerkesztése.")]
             pages.sort(key=lambda p: hu_key(p[0]))      # az ikonok magyar ABC-sorrendben
@@ -2654,6 +2663,17 @@ def gui_main(helper=None, run=True):
                               else '<span foreground="#b45309">○ nincs telepítve</span>')
                 bi.set_sensitive(not ok)
                 br.set_sensitive(ok)
+            if hasattr(self, "pr_btn"):
+                ok = pkg_ok("system-config-printer")
+                self.pr_btn.set_sensitive(ok)
+                if not ok:
+                    hint = "⚠ A nyomtatókezelő nincs telepítve: előbb telepítsd fent."
+                elif svc_active("cups"):
+                    hint = "● A CUPS nyomtatószolgáltatás fut."
+                else:
+                    hint = ("○ A CUPS nyomtatószolgáltatás nem fut, ezért a nyomtatók nem érhetők el "
+                            "(indítás: sudo systemctl enable --now cups).")
+                self.pr_hint.set_text(hint)
             if hasattr(self, "chrony_lbl"):
                 self.chrony_lbl.set_text(self.chrony_state())
             if hasattr(self, "ad_state"):
@@ -3390,6 +3410,36 @@ def gui_main(helper=None, run=True):
             p = getattr(self.h, "p", None)
             if not self.us_loaded and p is not None and p.poll() is None:
                 self.us_refresh()
+
+        # ------------------------------------------------ Nyomtatók (system-config-printer)
+        def page_printers(self):
+            b = self.mk_page("Nyomtatók",
+                             "Nyomtatók hozzáadása, eltávolítása és beállítása a system-config-printer programmal.")
+            self.pkg_row(b, "Nyomtatókezelő",
+                         "A system-config-printer program és a CUPS nyomtatószolgáltatás a Debian-tárolóból.",
+                         "system-config-printer",
+                         [("pkg", {"action": "install", "pkgs": ["cups", "system-config-printer"]})],
+                         [("pkg", {"action": "remove", "pkgs": ["system-config-printer"]})])
+            self.head(b, "Nyomtatók kezelése")
+            self.pr_hint = self.lab("")
+            b.pack_start(self.pr_hint, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.pr_btn = self.btn("Nyomtatóbeállítások megnyitása", self.pr_open)
+            bar.pack_start(self.pr_btn, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            return b
+
+        def pr_open(self, *_):
+            exe = shutil.which("system-config-printer")
+            if not exe:
+                self.say(1, "A system-config-printer nincs telepítve: előbb telepítsd.")
+                return
+            try:
+                subprocess.Popen([exe], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A nyomtatókezelő nem indítható: {e}")
+                return
+            self.say(0, "A nyomtatókezelő megnyílt (a módosításokhoz a program maga kér jelszót).")
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
