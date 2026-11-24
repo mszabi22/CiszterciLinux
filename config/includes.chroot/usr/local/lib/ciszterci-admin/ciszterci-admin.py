@@ -1525,6 +1525,453 @@ def op_share_pwdel(r):
     return f"A(z) {u.pw_name} Samba-hozzáférése törölve (a megosztások listáin megmarad a neve).", share_collect()
 
 
+# ------------------------------------------------------------ csomagkezelő (apt + Flatpak)
+PM_APT_RE = re.compile(r"^[a-z0-9][a-z0-9+.\-]{0,127}$")
+PM_FP_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,200}$")           # tároló neve / alkalmazásazonosító
+PM_FP_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]*(\.[A-Za-z0-9_\-]+)+$")
+PM_APT_OPTS = ["-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+PM_HIDE_RE = re.compile(r"(-dev|-dbg|-dbgsym|-doc)$|^lib(?!reoffice)")
+FLATHUB_URL = "https://dl.flathub.org/repo/flathub.flatpakrepo"
+PM_APT_COLOR, PM_FP_COLOR = "#A80030", "#2E6DB4"
+
+
+def pm_has_flatpak():
+    return shutil.which("flatpak") is not None
+
+
+def pm_fp_remote_add():
+    hrun(["flatpak", "remote-add", "--system", "--if-not-exists", "flathub", FLATHUB_URL])
+
+
+def op_pm_refresh(r):
+    hrun(["apt-get", "update"])
+    if pm_has_flatpak():
+        hrun(["flatpak", "update", "--system", "--appstream"], check=False)
+    return "A csomaglisták frissítve."
+
+
+def op_pm_upgrade(r):
+    hrun(["apt-get", "update"])
+    hrun(["apt-get", "full-upgrade"] + PM_APT_OPTS)
+    if pm_has_flatpak():
+        hrun(["flatpak", "update", "--system", "-y", "--noninteractive"])
+    return "A rendszer frissítve (apt és Flatpak)."
+
+
+def op_pm_install(r):
+    src, name = r.get("source"), str(r.get("id", ""))
+    if src == "apt":
+        if not PM_APT_RE.match(name):
+            raise RuntimeError("Érvénytelen csomagnév.")
+        hrun(["apt-get", "update"], check=False)
+        hrun(["apt-get", "install"] + PM_APT_OPTS + [name])
+        return f"Telepítve (apt): {name}"
+    if src == "flatpak":
+        remote = str(r.get("remote") or "flathub")
+        if not (PM_FP_ID_RE.match(name) and PM_FP_RE.match(remote)):
+            raise RuntimeError("Érvénytelen Flatpak-azonosító vagy tároló.")
+        if not pm_has_flatpak():
+            raise RuntimeError("A Flatpak nincs telepítve.")
+        if remote == "flathub":
+            pm_fp_remote_add()
+        hrun(["flatpak", "install", "--system", "-y", "--noninteractive", remote, name])
+        return f"Telepítve (Flatpak): {name}"
+    raise RuntimeError("Ismeretlen forrás.")
+
+
+def op_pm_remove(r):
+    src, name = r.get("source"), str(r.get("id", ""))
+    if src == "apt":
+        if not PM_APT_RE.match(name):
+            raise RuntimeError("Érvénytelen csomagnév.")
+        rc = subprocess.run(["dpkg-query", "-W", "-f", "${Essential}", name], capture_output=True, text=True)
+        if rc.stdout.strip() == "yes":
+            raise RuntimeError("Ez a rendszer működéséhez nélkülözhetetlen csomag, nem távolítható el.")
+        hrun(["apt-get", "remove", "-y", name])
+        return f"Eltávolítva (apt): {name}"
+    if src == "flatpak":
+        if not PM_FP_ID_RE.match(name):
+            raise RuntimeError("Érvénytelen Flatpak-azonosító.")
+        hrun(["flatpak", "uninstall", "--system", "-y", "--noninteractive", name])
+        return f"Eltávolítva (Flatpak): {name}"
+    raise RuntimeError("Ismeretlen forrás.")
+
+
+def op_pm_cleanup(r):
+    what = r.get("what")
+    if what not in ("autoremove", "clean", "both"):
+        raise RuntimeError("Ismeretlen takarítási művelet.")
+    if what in ("autoremove", "both"):
+        hrun(["apt-get", "autoremove", "-y"])
+        if pm_has_flatpak():
+            hrun(["flatpak", "uninstall", "--system", "--unused", "-y", "--noninteractive"])
+    if what in ("clean", "both"):
+        hrun(["apt-get", "clean"])
+    return "A takarítás kész."
+
+
+def op_pm_flatpak_setup(r):
+    if not pm_has_flatpak():
+        hrun(["apt-get", "update"], check=False)
+        hrun(["apt-get", "install", "-y", "flatpak"])
+    pm_fp_remote_add()
+    return ("A Flatpak és a Flathub tároló beállítva. A Flatpak programok az alkalmazásmenübe "
+            "újrabejelentkezés után kerülnek be.")
+
+
+# -- olvasó segédek (root nélkül, a GUI-ból)
+def pm_run(cmd, env=None, timeout=90):
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           env=env, timeout=timeout)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 127, ""
+    return p.returncode, p.stdout
+
+
+def pm_terms(term):
+    return [w for w in (x.lstrip("-") for x in term.split()) if w]
+
+
+def pm_apt_installed():
+    rc, out = pm_run(["dpkg-query", "-W", "-f", "${Package}\t${db:Status-Abbrev}\t${Version}\t${binary:Summary}\n"])
+    d = {}
+    for line in out.splitlines():
+        p = line.split("\t")
+        if len(p) >= 4 and p[1].startswith("ii"):
+            d[p[0]] = (p[2], p[3])
+    return d
+
+
+def pm_apt_manual():
+    rc, out = pm_run(["apt-mark", "showmanual"])
+    return set(out.split())
+
+
+def pm_apt_search(term):
+    pats = [re.sub(r"([.^$*+?()\[\]{}|\\])", r"\\\1", w) for w in pm_terms(term)]
+    rc, out = pm_run(["apt-cache", "search"] + pats)
+    res = []
+    for line in out.splitlines():
+        name, _, desc = line.partition(" - ")
+        if PM_APT_RE.match(name):
+            res.append((name, desc))
+    return res
+
+
+def pm_fp_installed():
+    if not pm_has_flatpak():
+        return {}
+    rc, out = pm_run(["flatpak", "list", "--system", "--app", "--columns=application,name,version,origin"])
+    d = {}
+    for line in out.splitlines():
+        p = line.split("\t")
+        if p and PM_FP_ID_RE.match(p[0]):
+            d[p[0]] = (p[1] if len(p) > 1 and p[1] else p[0], p[2] if len(p) > 2 else "", p[3] if len(p) > 3 else "")
+    return d
+
+
+def pm_fp_search(term):
+    if not pm_has_flatpak():
+        return []
+    rc, out = pm_run(["flatpak", "search", "--columns=application,name,description,remotes",
+                      " ".join(pm_terms(term))], timeout=60)
+    res = []
+    for line in out.splitlines():
+        p = line.split("\t")
+        if len(p) >= 2 and PM_FP_ID_RE.match(p[0]):
+            res.append((p[0], p[1], p[2] if len(p) > 2 else "", p[3] if len(p) > 3 else ""))
+    return res
+
+
+def pm_apt_upgradable():
+    rc, out = pm_run(["apt", "list", "--upgradable"], env=dict(os.environ, LC_ALL="C"))
+    res = []
+    for line in out.splitlines():
+        m = re.match(r"^(\S+?)/\S+ (\S+) \S+ \[upgradable from: (\S+)\]", line)
+        if m:
+            res.append((m.group(1), m.group(3), m.group(2)))
+    return res
+
+
+def pm_fp_updates():
+    if not pm_has_flatpak():
+        return []
+    rc, out = pm_run(["flatpak", "remote-ls", "--system", "--updates", "--app",
+                      "--columns=application,name,version"], timeout=60)
+    res = []
+    for line in out.splitlines():
+        p = line.split("\t")
+        if p and PM_FP_ID_RE.match(p[0]):
+            res.append((p[0], p[1] if len(p) > 1 and p[1] else p[0], p[2] if len(p) > 2 else ""))
+    return res
+
+
+def pm_apt_sim(action, name=None):
+    """apt-get -s: mely csomagok települnének / törlődnének (szimuláció, root nélkül)."""
+    cmd = ["apt-get", "-s", action] + ([name] if name else [])
+    rc, out = pm_run(cmd, env=dict(os.environ, LC_ALL="C"))
+    tag = "Inst" if action == "install" else "Remv"
+    pk = []
+    for line in out.splitlines():
+        m = re.match(rf"^{tag} (\S+)", line)
+        if m:
+            pk.append(m.group(1))
+    return rc, pk
+
+
+def pm_score(name, term):
+    n, t = name.lower(), term.lower().strip()
+    if not t:
+        return 3
+    if n == t:
+        return 0
+    if n.startswith(t):
+        return 1
+    return 2 if t in n else 3
+
+
+def pm_cache_size():
+    tot = 0
+    try:
+        for e in os.scandir("/var/cache/apt/archives"):
+            if e.is_file():
+                tot += e.stat().st_size
+    except OSError:
+        pass
+    return tot
+
+
+def pm_hsize(n):
+    for u in ("B", "kB", "MB", "GB"):
+        if n < 1024 or u == "GB":
+            return f"{n:.0f} {u}" if u == "B" else f"{n:.1f} {u}"
+        n /= 1024
+
+
+# -- magyar ABC szerinti rendezés (az ikonok sorrendjéhez)
+_HU_DI = ("dzs", "cs", "dz", "gy", "ly", "ny", "sz", "ty", "zs")
+_HU_ORDER = "a b c cs d dz dzs e f g gy h i j k l ly m n ny o ö p q r s sz t ty u ü v w x y z zs".split()
+_HU_BASE = str.maketrans("áéíóőúű", "aeioöuü")
+
+
+def hu_key(s):
+    t = s.lower().translate(_HU_BASE)
+    out, i = [], 0
+    while i < len(t):
+        for d in _HU_DI:
+            if t.startswith(d, i):
+                out.append(_HU_ORDER.index(d) + 1)
+                i += len(d)
+                break
+        else:
+            ch = t[i]
+            out.append(_HU_ORDER.index(ch) + 1 if ch in _HU_ORDER else 0)
+            i += 1
+    return (out, s.lower())
+
+
+# ------------------------------------------------------------ felhasználók kezelése
+US_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")                 # új felhasználó neve
+US_ANY_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")      # meglévő név / csoportnév
+US_UID_MIN, US_UID_MAX = 1000, 60000
+US_ADMIN_GROUP = "sudo"
+
+
+def us_shells():
+    seen, out = set(), []
+    try:
+        with open("/etc/shells", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if s.startswith("/") and os.path.exists(s) and not s.endswith(("nologin", "/false")):
+                    rp = os.path.realpath(s)
+                    if rp not in seen:
+                        seen.add(rp)
+                        out.append(s)
+    except OSError:
+        pass
+    return out or ["/bin/bash"]
+
+
+def us_shadow_field(name):
+    try:
+        with open("/etc/shadow", encoding="utf-8") as f:
+            for line in f:
+                p = line.rstrip("\n").split(":")
+                if p[0] == name and len(p) > 1:
+                    return p[1]
+    except OSError:
+        pass
+    return None
+
+
+def us_collect():
+    groups = grp.getgrall()
+    by_user = {}
+    for g in groups:
+        for m in g.gr_mem:
+            by_user.setdefault(m, []).append(g.gr_name)
+    gname = {g.gr_gid: g.gr_name for g in groups}
+    users = []
+    for u in pwd.getpwall():
+        sh = us_shadow_field(u.pw_name)
+        users.append({"name": u.pw_name, "uid": u.pw_uid, "gid": u.pw_gid, "group": gname.get(u.pw_gid, str(u.pw_gid)),
+                      "full": u.pw_gecos.split(",")[0], "home": u.pw_dir, "shell": u.pw_shell,
+                      "locked": bool(sh and sh.startswith("!")), "groups": sorted(by_user.get(u.pw_name, []))})
+    return {"users": users,
+            "groups": [{"name": g.gr_name, "gid": g.gr_gid, "members": list(g.gr_mem)} for g in groups],
+            "shells": us_shells(), "admin_group": US_ADMIN_GROUP}
+
+
+def us_target(r):
+    name = r.get("name")
+    if not isinstance(name, str) or not US_ANY_NAME_RE.match(name):
+        raise RuntimeError("Érvénytelen felhasználónév.")
+    try:
+        u = pwd.getpwnam(name)
+    except KeyError:
+        raise RuntimeError("Nincs ilyen felhasználó.")
+    if not US_UID_MIN <= u.pw_uid < US_UID_MAX:
+        raise RuntimeError("A rendszerfiókok és a root itt nem módosíthatók.")
+    return u
+
+
+def us_password(pw):
+    if not isinstance(pw, str) or not 6 <= len(pw) <= 128 or re.search(r"[\x00-\x1f\x7f]", pw):
+        raise RuntimeError("A jelszó 6–128 karakter lehet, vezérlőkarakter nélkül.")
+    return pw
+
+
+def us_fullname(s):
+    s = (s or "").strip() if isinstance(s, str) else ""
+    if len(s) > 100 or re.search(r"[:,\x00-\x1f\x7f]", s):
+        raise RuntimeError("A teljes név legfeljebb 100 karakter lehet, és nem tartalmazhat kettőspontot vagy vesszőt.")
+    return s
+
+
+def us_shell(sh):
+    try:
+        with open("/etc/shells", encoding="utf-8") as f:
+            ok = {line.strip() for line in f if line.strip().startswith("/")}
+    except OSError:
+        ok = set()
+    if not isinstance(sh, str) or sh not in ok:
+        raise RuntimeError("Érvénytelen parancsértelmező (shell).")
+    return sh
+
+
+def us_groups(names):
+    out = []
+    for n in names or []:
+        if not isinstance(n, str) or not US_ANY_NAME_RE.match(n):
+            raise RuntimeError("Érvénytelen csoportnév.")
+        try:
+            grp.getgrnam(n)
+        except KeyError:
+            raise RuntimeError(f"Nincs ilyen csoport: {n}")
+        out.append(n)
+    return out
+
+
+def us_admins_after(removed):
+    try:
+        mem = set(grp.getgrnam(US_ADMIN_GROUP).gr_mem)
+    except KeyError:
+        return None
+    return mem - {removed}
+
+
+def op_user_list(r):
+    return "A felhasználók betöltve.", us_collect()
+
+
+def op_user_add(r):
+    name = r.get("name", "")
+    if not isinstance(name, str) or not US_NAME_RE.match(name):
+        raise RuntimeError("Érvénytelen felhasználónév: kisbetűvel vagy _ jellel kezdődjön, csak kisbetű, szám, _ és - lehet, "
+                           "legfeljebb 32 karakter.")
+    try:
+        pwd.getpwnam(name)
+        raise RuntimeError("Már van ilyen nevű felhasználó.")
+    except KeyError:
+        pass
+    try:
+        grp.getgrnam(name)
+        raise RuntimeError("Már létezik ilyen nevű csoport.")
+    except KeyError:
+        pass
+    full = us_fullname(r.get("fullname"))
+    shell = us_shell(r.get("shell") or "/bin/bash")
+    pw = us_password(r.get("password"))
+    groups = us_groups(r.get("add_groups"))
+    hrun(["useradd", "-m" if r.get("create_home", True) else "-M", "-s", shell, "-c", full, name])
+    try:
+        hrun(["chpasswd"], stdin_text=f"{name}:{pw}")
+        if groups:
+            hrun(["usermod", "-a", "-G", ",".join(groups), name])
+        if r.get("force_change"):
+            hrun(["chage", "-d", "0", name])
+    except Exception:
+        hrun(["userdel", "-r", name], check=False)       # félig kész fiók nem maradhat
+        raise
+    return f"A(z) {name} felhasználó létrehozva.", us_collect()
+
+
+def op_user_edit(r):
+    u = us_target(r)
+    name = u.pw_name
+    me = invoking_user()
+    full = us_fullname(r.get("fullname"))
+    if full != u.pw_gecos.split(",")[0]:
+        hrun(["usermod", "-c", full, name])
+    shell = r.get("shell")
+    if shell and shell != u.pw_shell:
+        hrun(["usermod", "-s", us_shell(shell), name])
+    add, rm = us_groups(r.get("add_groups")), us_groups(r.get("rm_groups"))
+    if US_ADMIN_GROUP in rm:
+        if name == me:
+            raise RuntimeError("Saját magadat nem veheted ki a(z) sudo csoportból.")
+        left = us_admins_after(name)
+        if left is not None and not left:
+            raise RuntimeError("Az utolsó rendszergazdát nem lehet kivenni a(z) sudo csoportból.")
+    pw = r.get("password")
+    if pw:
+        hrun(["chpasswd"], stdin_text=f"{name}:{us_password(pw)}")
+    want_locked = bool(r.get("locked"))
+    field = us_shadow_field(name) or ""
+    now_locked = field.startswith("!")
+    if want_locked and not now_locked:
+        if name == me:
+            raise RuntimeError("Saját fiókodat nem zárolhatod.")
+        hrun(["usermod", "-L", name])
+    elif not want_locked and now_locked:
+        if field.lstrip("!*") == "":
+            raise RuntimeError("A zárolás feloldásához új jelszót kell megadni (a fióknak most nincs jelszava).")
+        hrun(["usermod", "-U", name])
+    if r.get("force_change"):
+        hrun(["chage", "-d", "0", name])
+    if add:
+        hrun(["usermod", "-a", "-G", ",".join(add), name])
+    for g in rm:
+        hrun(["gpasswd", "-d", name, g], check=False)
+    return f"A(z) {name} felhasználó adatai mentve.", us_collect()
+
+
+def op_user_delete(r):
+    u = us_target(r)
+    name = u.pw_name
+    if name == invoking_user():
+        raise RuntimeError("Saját magadat nem törölheted.")
+    left = us_admins_after(name)
+    if left is not None and not left and name in grp.getgrnam(US_ADMIN_GROUP).gr_mem:
+        raise RuntimeError("Az utolsó rendszergazdát nem lehet törölni.")
+    if subprocess.run(["pgrep", "-u", str(u.pw_uid)], capture_output=True).returncode == 0:
+        raise RuntimeError("A felhasználó be van jelentkezve, vagy futnak a folyamatai: előbb jelentkeztesd ki.")
+    hrun(["userdel"] + (["-r"] if r.get("remove_home") else []) + [name])
+    return f"A(z) {name} felhasználó eltávolítva.", us_collect()
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
@@ -1532,7 +1979,11 @@ OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremov
        "share_setup": op_share_setup, "share_list": op_share_list, "share_save": op_share_save,
        "share_delete": op_share_delete, "share_toggle": op_share_toggle, "share_pw": op_share_pw,
        "share_pwdel": op_share_pwdel, "share_restart": op_share_restart,
-       "ad_join": op_ad_join, "ad_leave": op_ad_leave}
+       "ad_join": op_ad_join, "ad_leave": op_ad_leave,
+       "pm_refresh": op_pm_refresh, "pm_upgrade": op_pm_upgrade, "pm_install": op_pm_install,
+       "pm_remove": op_pm_remove, "pm_cleanup": op_pm_cleanup, "pm_flatpak_setup": op_pm_flatpak_setup,
+       "user_list": op_user_list, "user_add": op_user_add, "user_edit": op_user_edit,
+       "user_delete": op_user_delete}
 
 
 def helper_main():
@@ -1725,8 +2176,26 @@ XP_FALLBACK_ICON = {"login": "system-users", "remote": "help-browser", "cloud": 
                     "time": "preferences-system-time", "system": "computer",
                     "back": "go-previous", "fwd": "go-next", "up": "go-up"}
 
+XP_SVG["pkg"] = ('<path d="M6 16 L24 8 L42 16 L24 24 Z" fill="#ecd093" stroke="#8a5f1d"/>'
+                 '<path d="M6 16 V34 L24 42 V24 Z" fill="#dcae60" stroke="#8a5f1d"/>'
+                 '<path d="M42 16 V34 L24 42 V24 Z" fill="#c28f42" stroke="#8a5f1d"/>'
+                 '<path d="M15 12 L33 20" stroke="#fff6dc" stroke-width="3"/>'
+                 '<circle cx="35" cy="35" r="10" fill="url(#g)" stroke="#1d6f1d" stroke-width="1.5"/>'
+                 '<path d="M35 30 V40 M31 36 L35 41 L39 36" stroke="#fff" stroke-width="2.8" fill="none" '
+                 'stroke-linecap="round" stroke-linejoin="round"/>')
+XP_FALLBACK_ICON["pkg"] = "system-software-install"
+XP_SVG["users"] = ('<circle cx="32" cy="14" r="6" fill="#f5d6a8" stroke="#8a5f1d"/>'
+                   '<path d="M21 36 C21 26 43 26 43 36 Z" fill="#8fbdf2" stroke="#0b2a7a"/>'
+                   '<circle cx="17" cy="18" r="7" fill="#f5c27a" stroke="#8a5f1d"/>'
+                   '<path d="M4 42 C4 29 30 29 30 42 Z" fill="url(#a)" stroke="#0b2a7a"/>')
+XP_SVG["question"] = ('<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+                      '<path d="M17 19 C17 10 31 10 31 19 C31 25 24 25 24 31" stroke="#fff" stroke-width="5" fill="none" '
+                      'stroke-linecap="round"/><circle cx="24" cy="38" r="3" fill="#fff"/>')
+XP_FALLBACK_ICON["users"] = "system-users"
+XP_FALLBACK_ICON["question"] = "dialog-question"
 XP_CSS = """
-window.xp { background-color: #ECE9D8; }
+window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
+.xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
 .xp * { font-family: Tahoma, "DejaVu Sans", "Noto Sans", sans-serif; font-size: 9pt; }
 .xp .monospace, .xp textview.monospace { font-family: monospace; }
 .xp label, .xp checkbutton, .xp radiobutton { color: #000000; }
@@ -1784,6 +2253,17 @@ window.xp { background-color: #ECE9D8; }
 .xp label.xp-pagetitle { font-size: 15pt; font-weight: bold; color: #1D3E8F; }
 .xp label.xp-head { color: #0046D5; border-bottom: 1px solid #D0D0BF; padding-bottom: 2px; }
 .xp .xp-status { background-color: #ECE9D8; border-top: 1px solid #ACA899; }
+.xp treeview.view { background-color: #FFFFFF; color: #000000; }
+.xp treeview.view:selected { background-color: #316AC5; color: #FFFFFF; }
+.xp treeview header button { border-radius: 0px; padding: 2px 6px; border: 1px solid #ACA899;
+                             background-image: linear-gradient(to bottom, #FFFFFF, #EBEADB); box-shadow: none; }
+.xp treeview header button:hover { box-shadow: inset 0 -2px 0 0 #FFC83C; }
+.xp scrolledwindow.xp-list { border: 1px solid #7F9DB9; }
+.xp notebook > header { background-color: #ECE9D8; border: none; }
+.xp notebook > header > tabs > tab { padding: 4px 14px; border: 1px solid #919B9C; border-radius: 3px 3px 0px 0px;
+                                     background-image: linear-gradient(to bottom, #FFFFFF, #ECE9D8); color: #000000; }
+.xp notebook > header > tabs > tab:checked { background-image: none; background-color: #FCFCFE; border-top: 2px solid #FFC83C; }
+.xp notebook > stack { background-color: #FCFCFE; border: 1px solid #919B9C; }
 """
 
 
@@ -1815,6 +2295,10 @@ def gui_main(helper=None, run=True):
 
     def xp_apply_css():
         from gi.repository import Gdk
+        try:   # sötét rendszertéma mellett is a világos változat (egységes megjelenés)
+            Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", False)
+        except Exception:
+            pass
         prov = Gtk.CssProvider()
         try:
             prov.load_from_data(XP_CSS.encode("utf-8"))
@@ -1857,11 +2341,19 @@ def gui_main(helper=None, run=True):
                 ("Rendszeridő", self.page_time, "time",
                  "Dátum, idő és az internetes időszinkron beállítása."),
                 ("Rendszer", self.page_system, "system",
-                 "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás.")]
+                 "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
+                ("Csomagkezelő", self.page_pkg, "pkg",
+                 "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Felhasználók", self.page_users, "users",
+                 "Helyi felhasználói fiókok: hozzáadás, eltávolítás, csoporttagságok és tulajdonságok szerkesztése.")]
+            pages.sort(key=lambda p: hu_key(p[0]))      # az ikonok magyar ABC-sorrendben
             self.pages_meta = pages
             self.page_names = []
             self.wg_idx = [p[0] for p in pages].index("WireGuard VPN")
             self.sh_idx = [p[0] for p in pages].index("Mappamegosztás")
+            self.pm_idx = [p[0] for p in pages].index("Csomagkezelő")
+            self.us_idx = [p[0] for p in pages].index("Felhasználók")
+            self.pm_loaded, self.pm_seq = False, 0
             self.nav_hist, self.nav_pos = [-1], 0
 
             outer = Gtk.Box(orientation=V)
@@ -1968,6 +2460,10 @@ def gui_main(helper=None, run=True):
                     self.wg_refresh()
                 if idx == self.sh_idx and not self.sh_loaded and pkg_ok("samba"):
                     self.sh_refresh()
+                if idx == self.pm_idx and not self.pm_loaded:
+                    self.pm_on_show()
+                if idx == self.us_idx and not self.us_loaded:
+                    self.us_on_show()
             self.b_back.set_sensitive(self.nav_pos > 0)
             self.b_fwd.set_sensitive(self.nav_pos < len(self.nav_hist) - 1)
             self.b_up.set_sensitive(idx >= 0)
@@ -2030,8 +2526,14 @@ def gui_main(helper=None, run=True):
             return False
 
         def confirm(self, text):
-            d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+            d, area = self.xp_dialog("Megerősítés", "question", "", "OK")
+            l = Gtk.Label(label=text, xalign=0)
+            l.set_line_wrap(True)
+            l.set_max_width_chars(52)
+            for m in ("top", "bottom", "start", "end"):
+                getattr(l, f"set_margin_{m}")(18)
+            area.pack_start(l, True, True, 0)
+            d.show_all()
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             return ok
@@ -2187,6 +2689,707 @@ def gui_main(helper=None, run=True):
                 self.sh_hint.set_text(hint)
                 if ok and not self.sh_loaded and self.stack.get_visible_child_name() == self.page_names[self.sh_idx]:
                     self.sh_refresh()
+
+        # ------------------------------------------------ Csomagkezelő (apt + Flatpak)
+        def pm_badge(self, src, remote=""):
+            from xml.sax.saxutils import escape
+            if src == "apt":
+                return f'<span background="{PM_APT_COLOR}" foreground="#FFFFFF"><b> apt </b></span>'
+            tail = f" · {escape(remote)}" if remote else ""
+            return f'<span background="{PM_FP_COLOR}" foreground="#FFFFFF"><b> Flatpak{tail} </b></span>'
+
+        def pm_src_text(self, src, remote=""):
+            return "apt – Debian csomagtár" if src == "apt" else f"Flatpak – {remote or 'flathub'} tároló"
+
+        def page_pkg(self):
+            b = self.mk_page("Csomagkezelő",
+                             "Programok keresése, telepítése és eltávolítása az apt (Debian-tárolók) és a Flatpak "
+                             "(Flathub) közös felületén, rendszerfrissítés és takarítás.")
+            legend = Gtk.Label(xalign=0)
+            legend.set_use_markup(True)
+            legend.set_markup(f'Forrás jelölése:  {self.pm_badge("apt")} Debian csomagtár     '
+                              f'{self.pm_badge("flatpak", "flathub")} Flatpak-tároló (általában Flathub)')
+            b.pack_start(legend, False, False, 0)
+            nb = Gtk.Notebook()
+            nb.append_page(self.pm_tab_search(), Gtk.Label(label="Keresés és telepítés"))
+            nb.append_page(self.pm_tab_updates(), Gtk.Label(label="Frissítések"))
+            nb.append_page(self.pm_tab_clean(), Gtk.Label(label="Karbantartás"))
+            b.pack_start(nb, True, True, 0)
+            return b
+
+        def pm_list_view(self, store, columns):
+            from gi.repository import Pango
+            tv = Gtk.TreeView(model=store)
+            for title, idx, markup, expand, sortcol in columns:
+                r = Gtk.CellRendererText()
+                if expand:
+                    r.set_property("ellipsize", Pango.EllipsizeMode.END)
+                col = Gtk.TreeViewColumn(title, r, **({"markup": idx} if markup else {"text": idx}))
+                col.set_resizable(True)
+                col.set_expand(expand)
+                if sortcol is not None:
+                    col.set_sort_column_id(sortcol)
+                tv.append_column(col)
+            sw = Gtk.ScrolledWindow()
+            sw.get_style_context().add_class("xp-list")
+            sw.set_min_content_height(300)
+            sw.add(tv)
+            return tv, sw
+
+        def pm_tab_search(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            row = Gtk.Box(spacing=6)
+            self.pm_entry = Gtk.Entry()
+            self.pm_entry.set_placeholder_text("Program neve vagy leírása…")
+            self.pm_entry.connect("activate", self.pm_do_search)
+            self.pm_src = Gtk.ComboBoxText()
+            for t in ("Minden forrás", "Csak apt", "Csak Flatpak"):
+                self.pm_src.append_text(t)
+            self.pm_src.set_active(0)
+            self.pm_sbtn = self.btn("Keresés", self.pm_do_search)
+            row.pack_start(self.pm_entry, True, True, 0)
+            row.pack_start(self.pm_src, False, False, 0)
+            row.pack_start(self.pm_sbtn, False, False, 0)
+            v.pack_start(row, False, False, 0)
+            opts = Gtk.Box(spacing=16)
+            self.pm_chk_inst = Gtk.CheckButton(label="Csak a telepítettek")
+            self.pm_chk_lib = Gtk.CheckButton(label="Könyvtárak és fejlesztői csomagok elrejtése")
+            self.pm_chk_lib.set_active(True)
+            opts.pack_start(self.pm_chk_inst, False, False, 0)
+            opts.pack_start(self.pm_chk_lib, False, False, 0)
+            v.pack_start(opts, False, False, 0)
+            self.pm_fp_hint = self.lab("")
+            self.pm_fp_btn = self.btn("Flatpak beállítása", self.pm_fp_setup)
+            for w in (self.pm_fp_hint, self.pm_fp_btn):
+                w.set_no_show_all(True)
+                w.hide()
+                v.pack_start(w, False, False, 0)
+            self.pm_store = Gtk.ListStore(str, str, str, str, str, str, str, bool)
+            self.pm_tv, sw = self.pm_list_view(self.pm_store, [
+                ("Forrás", 1, True, False, 0), ("Név", 2, False, False, 2),
+                ("Leírás", 3, False, True, None), ("Állapot", 4, False, False, 4)])
+            self.pm_tv.get_selection().connect("changed", self.pm_on_sel)
+            self.pm_tv.connect("row-activated", lambda *_: self.pm_primary())
+            v.pack_start(sw, True, True, 0)
+            self.pm_msg = self.lab("")
+            v.pack_start(self.pm_msg, False, False, 0)
+            self.pm_info = Gtk.Label(xalign=0)
+            self.pm_info.set_use_markup(True)
+            self.pm_info.set_line_wrap(True)
+            self.pm_info.set_selectable(True)
+            v.pack_start(self.pm_info, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.pm_b_inst = self.btn("Telepítés", self.pm_install)
+            self.pm_b_rm = self.btn("Eltávolítás", self.pm_remove)
+            for w in (self.pm_b_inst, self.pm_b_rm):
+                w.set_sensitive(False)
+                bar.pack_start(w, False, False, 0)
+            v.pack_start(bar, False, False, 0)
+            return v
+
+        def pm_selected(self):
+            model, it = self.pm_tv.get_selection().get_selected()
+            return model[it] if it else None
+
+        def pm_on_sel(self, *_):
+            from xml.sax.saxutils import escape
+            row = self.pm_selected()
+            if not row:
+                self.pm_info.set_text("")
+                self.pm_b_inst.set_label("Telepítés")
+                self.pm_b_rm.set_label("Eltávolítás")
+                self.pm_b_inst.set_sensitive(False)
+                self.pm_b_rm.set_sensitive(False)
+                return
+            src, badge, name, desc, state, pid, remote, inst = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]
+            tag = "apt" if src == "apt" else "Flatpak"
+            self.pm_info.set_markup(f"<b>{escape(name)}</b>  {badge}\nForrás: <b>{escape(self.pm_src_text(src, remote))}</b>"
+                                    + (f"   ·   azonosító: {escape(pid)}" if src != "apt" else ""))
+            self.pm_b_inst.set_label(f"Telepítés ({tag})")
+            self.pm_b_rm.set_label(f"Eltávolítás ({tag})")
+            self.pm_b_inst.set_sensitive(not inst)
+            self.pm_b_rm.set_sensitive(bool(inst))
+
+        def pm_primary(self):
+            row = self.pm_selected()
+            if row:
+                (self.pm_remove if row[7] else self.pm_install)()
+
+        def pm_row(self, src, name, desc, pid, remote, inst):
+            return [src, self.pm_badge(src, remote), name, desc, "✔ telepítve" if inst else "",
+                    pid, remote, bool(inst)]
+
+        def pm_do_search(self, *_):
+            term = self.pm_entry.get_text().strip()
+            only = self.pm_chk_inst.get_active()
+            hide = self.pm_chk_lib.get_active()
+            sel = self.pm_src.get_active()
+            if not term and not only:
+                self.pm_msg.set_text("Írd be a keresett program nevét vagy egy szót a leírásából.")
+                return
+            self.pm_seq += 1
+            seq = self.pm_seq
+            self.pm_sbtn.set_sensitive(False)
+            self.pm_msg.set_text("Keresés…")
+            fp_ok = pm_has_flatpak()
+
+            def worker():
+                rows, notes = [], []
+                try:
+                    words = [w.lower() for w in pm_terms(term)]
+                    if sel in (0, 1):
+                        inst = pm_apt_installed()
+                        if only:
+                            manual = pm_apt_manual() if not words else None
+                            for n, (ver, summ) in inst.items():
+                                if manual is not None and n not in manual:
+                                    continue
+                                if all(w in (n + " " + summ).lower() for w in words):
+                                    if not (hide and PM_HIDE_RE.search(n)):
+                                        rows.append(self.pm_row("apt", n, summ, n, "", True))
+                        else:
+                            for n, d in pm_apt_search(term):
+                                if not (hide and PM_HIDE_RE.search(n)):
+                                    rows.append(self.pm_row("apt", n, d, n, "", n in inst))
+                    if sel in (0, 2):
+                        if not fp_ok:
+                            if sel == 2:
+                                notes.append("A Flatpak nincs telepítve.")
+                        else:
+                            fi = pm_fp_installed()
+                            if only:
+                                for pid, (n, ver, orig) in fi.items():
+                                    if all(w in (pid + " " + n).lower() for w in words):
+                                        rows.append(self.pm_row("flatpak", n, f"{ver}  —  {pid}".strip(" —"),
+                                                                pid, orig or "flathub", True))
+                            else:
+                                for pid, n, d, rem in pm_fp_search(term):
+                                    rows.append(self.pm_row("flatpak", n, f"{d}  —  {pid}", pid,
+                                                            (rem.split(",")[0].strip() if rem else "flathub"),
+                                                            pid in fi))
+                    rows.sort(key=lambda r: (pm_score(r[2], term), r[2].lower(), r[0]))
+                    if len(rows) > 500:
+                        rows = rows[:500]
+                        notes.append("Csak az első 500 találat látszik, szűkítsd a keresést.")
+                    na = sum(1 for r in rows if r[0] == "apt")
+                    msg = f"{len(rows)} találat (apt: {na}, Flatpak: {len(rows) - na})."
+                    if not rows:
+                        msg = "Nincs találat."
+                    msg = " ".join([msg] + notes)
+                except Exception as e:  # noqa: BLE001
+                    rows, msg = [], f"Hiba a keresés közben: {e}"
+                GLib.idle_add(self.pm_show_results, seq, rows, msg)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def pm_show_results(self, seq, rows, msg):
+            if seq != self.pm_seq:
+                return False
+            self.pm_sbtn.set_sensitive(True)
+            self.pm_store.clear()
+            for r in rows:
+                self.pm_store.append(r)
+            self.pm_msg.set_text(msg)
+            self.pm_on_sel()
+            return False
+
+        def pm_refresh_states(self):
+            def worker():
+                ai, fi = pm_apt_installed(), pm_fp_installed()
+                GLib.idle_add(self.pm_apply_states, set(ai), set(fi))
+            threading.Thread(target=worker, daemon=True).start()
+
+        def pm_apply_states(self, ai, fi):
+            for row in self.pm_store:
+                inst = (row[5] in ai) if row[0] == "apt" else (row[5] in fi)
+                row[7] = inst
+                row[4] = "✔ telepítve" if inst else ""
+            self.pm_on_sel()
+            return False
+
+        def pm_install(self, *_):
+            row = self.pm_selected()
+            if not row or row[7]:
+                return
+            src, name, pid, remote = row[0], row[2], row[5], row[6]
+            if src == "apt":
+                rc, pk = pm_apt_sim("install", pid)
+                extra = [p for p in pk if p != pid]
+                text = f"Telepítés\n\nProgram: {name}\nForrás: {self.pm_src_text('apt')}"
+                if extra:
+                    text += (f"\n\nA függőségek miatt további {len(extra)} csomag települ: "
+                             + ", ".join(extra[:8]) + (" …" if len(extra) > 8 else ""))
+                if rc != 0:
+                    text += "\n\n⚠ Az előzetes ellenőrzés hibát jelzett, a telepítés valószínűleg nem sikerül."
+                params = {"source": "apt", "id": pid}
+            else:
+                text = (f"Telepítés\n\nProgram: {name} ({pid})\nForrás: {self.pm_src_text('flatpak', remote)}\n\n"
+                        "A Flatpak programok saját futtatókörnyezetet is letölthetnek (akár több száz MB).")
+                params = {"source": "flatpak", "id": pid, "remote": remote or "flathub"}
+            if self.confirm(text):
+                self.run_task([("pm_install", params)], cb=lambda *_: self.pm_refresh_states())
+
+        def pm_remove(self, *_):
+            row = self.pm_selected()
+            if not row or not row[7]:
+                return
+            src, name, pid, remote = row[0], row[2], row[5], row[6]
+            text = f"Eltávolítás\n\nProgram: {name}\nForrás: {self.pm_src_text(src, remote)}"
+            if src == "apt":
+                rc, pk = pm_apt_sim("remove", pid)
+                extra = [p for p in pk if p != pid]
+                if extra:
+                    text += (f"\n\nVele együtt további {len(extra)} csomag is eltávolításra kerül: "
+                             + ", ".join(extra[:10]) + (" …" if len(extra) > 10 else ""))
+                    if len(extra) >= 10:
+                        text += "\n\n⚠ Ez sok csomag: ellenőrizd a listát, mielőtt folytatod!"
+                params = {"source": "apt", "id": pid}
+            else:
+                params = {"source": "flatpak", "id": pid}
+            if self.confirm(text):
+                self.run_task([("pm_remove", params)], cb=lambda *_: self.pm_refresh_states())
+
+        # --- Flatpak állapot és beállítás
+        def pm_check_flatpak(self):
+            def worker():
+                have_fp = pm_has_flatpak()
+                remotes = []
+                if have_fp:
+                    rc, out = pm_run(["flatpak", "remotes", "--system", "--columns=name"])
+                    remotes = [x.strip() for x in out.splitlines() if x.strip()]
+                GLib.idle_add(self.pm_fp_show, have_fp, remotes)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def pm_fp_show(self, have_fp, remotes):
+            if not have_fp:
+                self.pm_fp_hint.set_text("⚠ A Flatpak nincs telepítve, ezért most csak az apt-programok között lehet keresni.")
+                self.pm_fp_btn.set_label("Flatpak telepítése és a Flathub hozzáadása")
+            elif not remotes:
+                self.pm_fp_hint.set_text("⚠ Nincs beállított Flatpak-tároló, ezért a Flatpak-programok keresése nem ad találatot.")
+                self.pm_fp_btn.set_label("Flathub tároló hozzáadása")
+            else:
+                self.pm_fp_hint.hide()
+                self.pm_fp_btn.hide()
+                return False
+            self.pm_fp_hint.show()
+            self.pm_fp_btn.show()
+            return False
+
+        def pm_fp_setup(self, *_):
+            if self.confirm("Beállítom a Flatpak-ot: szükség esetén telepítem (apt-get install flatpak), "
+                            "és hozzáadom a Flathub tárolót?"):
+                self.run_task([("pm_flatpak_setup", {})], cb=lambda *_: self.pm_check_flatpak())
+
+        # --- frissítések
+        def pm_tab_updates(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            self.pm_ulbl = self.lab("")
+            v.pack_start(self.pm_ulbl, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            bar.pack_start(self.btn("Frissítések keresése", self.pm_check_updates), False, False, 0)
+            bar.pack_start(self.btn("Összes frissítése", self.pm_upgrade_all), False, False, 0)
+            v.pack_start(bar, False, False, 0)
+            self.pm_ustore = Gtk.ListStore(str, str, str, str)
+            tv, sw = self.pm_list_view(self.pm_ustore, [
+                ("Forrás", 0, True, False, None), ("Program", 1, False, True, 1),
+                ("Jelenlegi verzió", 2, False, False, None), ("Új verzió", 3, False, False, None)])
+            v.pack_start(sw, True, True, 0)
+            self.pm_reboot = self.lab("")
+            v.pack_start(self.pm_reboot, False, False, 0)
+            return v
+
+        def pm_load_updates(self):
+            self.pm_ulbl.set_text("Frissítések keresése…")
+
+            def worker():
+                try:
+                    a, f = pm_apt_upgradable(), pm_fp_updates()
+                except Exception:  # noqa: BLE001
+                    a, f = [], []
+                GLib.idle_add(self.pm_show_updates, a, f)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def pm_show_updates(self, apt_up, fp_up):
+            self.pm_ustore.clear()
+            for n, old, new in apt_up:
+                self.pm_ustore.append([self.pm_badge("apt"), n, old, new])
+            for pid, n, ver in fp_up:
+                self.pm_ustore.append([self.pm_badge("flatpak", "flathub"), n, "", ver])
+            tot = len(apt_up) + len(fp_up)
+            if tot:
+                self.pm_ulbl.set_text(f"{tot} frissítés érhető el (apt: {len(apt_up)}, Flatpak: {len(fp_up)}).")
+            else:
+                self.pm_ulbl.set_text("Nincs elérhető frissítés. (A lista a legutóbbi csomaglista-frissítés "
+                                      "állapotát mutatja: a „Frissítések keresése” gomb újratölti.)")
+            self.pm_reboot.set_text("⚠ A rendszer újraindítást kér a frissítések érvényesítéséhez."
+                                    if os.path.exists("/run/reboot-required") else "")
+            return False
+
+        def pm_check_updates(self, *_):
+            self.run_task([("pm_refresh", {})], cb=lambda *_: self.pm_load_updates())
+
+        def pm_upgrade_all(self, *_):
+            if self.confirm("Frissítsem a teljes rendszert?\n\nAz apt-csomagok (apt-get full-upgrade) és a "
+                            "Flatpak-programok is frissülnek. Ez eltarthat egy ideig."):
+                self.run_task([("pm_upgrade", {})],
+                              cb=lambda *_: (self.pm_load_updates(), self.pm_refresh_states()))
+
+        # --- karbantartás
+        def pm_tab_clean(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            self.head(v, "Felesleges csomagok")
+            v.pack_start(self.lab("Az apt-get autoremove törli azokat a csomagokat, amelyeket korábban "
+                                  "függőségként telepített a rendszer, de már semmi sem igényli őket. "
+                                  "A Flatpak nem használt futtatókörnyezeteit is eltávolítja."), False, False, 0)
+            v.pack_start(self.btn("Felesleges csomagok eltávolítása", self.pm_do_autoremove), False, False, 0)
+            self.head(v, "Letöltött csomagfájlok")
+            self.pm_cache_lbl = self.lab("")
+            v.pack_start(self.pm_cache_lbl, False, False, 0)
+            v.pack_start(self.lab("Az apt-get clean törli a letöltött .deb fájlokat; a telepített programokat "
+                                  "nem érinti."), False, False, 0)
+            v.pack_start(self.btn("Letöltött csomagfájlok törlése", self.pm_do_clean), False, False, 0)
+            self.head(v, "Teljes takarítás")
+            v.pack_start(self.btn("Mindkettő egyszerre", self.pm_do_both), False, False, 0)
+            return v
+
+        def pm_update_cache_lbl(self, *_):
+            self.pm_cache_lbl.set_text(f"A gyorsítótár jelenlegi mérete: {pm_hsize(pm_cache_size())}")
+
+        def pm_do_autoremove(self, *_):
+            self.pm_cleanup("autoremove")
+
+        def pm_do_clean(self, *_):
+            self.pm_cleanup("clean")
+
+        def pm_do_both(self, *_):
+            self.pm_cleanup("both")
+
+        def pm_cleanup(self, what):
+            text = ""
+            if what in ("autoremove", "both"):
+                rc, pk = pm_apt_sim("autoremove")
+                if pk:
+                    text += (f"Az apt-get autoremove a következő {len(pk)} csomagot törli: "
+                             + ", ".join(pk[:15]) + (" …" if len(pk) > 15 else "") + "\n\n")
+                else:
+                    text += "Nincs felesleges apt-csomag.\n\n"
+                text += "A Flatpak nem használt futtatókörnyezetei is törlődnek.\n\n"
+            if what in ("clean", "both"):
+                text += f"A letöltött csomagfájlok törlődnek ({pm_hsize(pm_cache_size())}).\n\n"
+            if self.confirm(text + "Folytatod?"):
+                self.run_task([("pm_cleanup", {"what": what})], cb=lambda *_: self.pm_update_cache_lbl())
+
+        def pm_on_show(self):
+            self.pm_loaded = True
+            self.pm_check_flatpak()
+            self.pm_load_updates()
+            self.pm_update_cache_lbl()
+
+        # ------------------------------------------------ XP-s párbeszédablakok
+        def xp_banner(self, kind, title, sub=""):
+            hd = Gtk.Box(spacing=12)
+            hd.get_style_context().add_class("xp-pagehead")
+            hd.pack_start(xp_image(kind, 40), False, False, 0)
+            tx = Gtk.Box(orientation=V, spacing=2)
+            t = Gtk.Label(label=title, xalign=0)
+            t.set_line_wrap(True)
+            t.get_style_context().add_class("xp-pagetitle")
+            tx.pack_start(t, False, False, 0)
+            if sub:
+                s = Gtk.Label(label=sub, xalign=0)
+                s.set_line_wrap(True)
+                tx.pack_start(s, False, False, 0)
+            hd.pack_start(tx, True, True, 0)
+            return hd
+
+        def xp_dialog(self, title, kind, sub, ok_label):
+            d = Gtk.Dialog(title=title, transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, ok_label, Gtk.ResponseType.OK)
+            d.set_default_response(Gtk.ResponseType.OK)
+            d.get_action_area().set_border_width(8)
+            area = d.get_content_area()
+            area.set_spacing(0)
+            area.pack_start(self.xp_banner(kind, title, sub), False, False, 0)
+            return d, area
+
+        # ------------------------------------------------ Felhasználók
+        US_GROUP_INFO = {
+            "sudo": "rendszergazdai jog (sudo)", "adm": "rendszernaplók olvasása", "audio": "hangeszközök",
+            "video": "kamera, videó, grafika", "cdrom": "CD/DVD-meghajtó", "plugdev": "cserélhető eszközök",
+            "netdev": "hálózati beállítások", "users": "általános felhasználói csoport", "dialout": "soros portok",
+            "lpadmin": "nyomtatók kezelése", "scanner": "lapolvasók", "sambashare": "Samba-megosztások létrehozása",
+            "vpn": "VPN jelszó nélküli kapcsolása", "docker": "Docker (gyakorlatilag rendszergazdai jog!)",
+            "libvirt": "virtualizáció", "kvm": "virtualizáció", "bluetooth": "Bluetooth", "wireshark": "hálózatfigyelés",
+            "systemd-journal": "rendszernapló (journal)", "input": "beviteli eszközök", "render": "grafikus gyorsítás",
+            "floppy": "hajlékonylemez-meghajtó", "fuse": "FUSE-fájlrendszerek", "staff": "helyi programtelepítés"}
+        US_DEFAULT_GROUPS = ("audio", "video", "cdrom", "plugdev", "netdev")
+
+        def page_users(self):
+            b = self.mk_page("Felhasználók",
+                             "A helyi felhasználói fiókok kezelése: hozzáadás, eltávolítás, csoporttagságok (jogok) "
+                             "és tulajdonságok szerkesztése. Rendszergazdai hitelesítés után használható.")
+            self.us_data = {"users": [], "groups": [], "shells": []}
+            self.us_loaded = False
+            ar = Gtk.Box(spacing=10)
+            self.us_hint = self.lab("A felhasználók kezeléséhez rendszergazdai hitelesítés szükséges.")
+            self.us_auth = self.btn("Hitelesítés és a lista betöltése", self.us_refresh)
+            ar.pack_start(self.us_hint, True, True, 0)
+            ar.pack_start(self.us_auth, False, False, 0)
+            b.pack_start(ar, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.us_b_new = self.btn("Új felhasználó…", self.us_new)
+            self.us_b_edit = self.btn("Szerkesztés…", self.us_edit)
+            self.us_b_del = self.btn("Eltávolítás…", self.us_delete)
+            self.us_chk_sys = Gtk.CheckButton(label="Rendszerfiókok mutatása")
+            self.us_chk_sys.connect("toggled", self.us_render)
+            for w in (self.us_b_new, self.us_b_edit, self.us_b_del, self.us_chk_sys):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.us_store = Gtk.ListStore(str, str, str, str, str, str)
+            self.us_tv, sw = self.pm_list_view(self.us_store, [
+                ("Felhasználó", 0, False, False, 0), ("Teljes név", 1, False, True, 1),
+                ("UID", 2, False, False, 2), ("Csoportok", 3, False, True, 3),
+                ("Parancsértelmező", 4, False, False, 4), ("Állapot", 5, True, False, None)])
+            self.us_tv.get_selection().connect("changed", self.us_set_sensitivity)
+            self.us_tv.connect("row-activated", lambda *_: self.us_edit())
+            b.pack_start(sw, True, True, 0)
+            self.us_set_sensitivity()
+            return b
+
+        def us_me(self):
+            try:
+                return pwd.getpwuid(os.getuid()).pw_name
+            except KeyError:
+                return ""
+
+        def us_selected(self):
+            model, it = self.us_tv.get_selection().get_selected()
+            if not it:
+                return None
+            for u in self.us_data["users"]:
+                if u["name"] == model[it][0]:
+                    return u
+            return None
+
+        def us_regular(self, u):
+            return US_UID_MIN <= u["uid"] < US_UID_MAX
+
+        def us_set_sensitivity(self, *_):
+            ok = self.us_loaded
+            self.us_b_new.set_sensitive(ok)
+            self.us_chk_sys.set_sensitive(ok)
+            u = self.us_selected() if ok else None
+            self.us_b_edit.set_sensitive(bool(u and self.us_regular(u)))
+            self.us_b_del.set_sensitive(bool(u and self.us_regular(u) and u["name"] != self.us_me()))
+
+        def us_render(self, *_):
+            sel = self.us_selected()
+            self.us_store.clear()
+            me = self.us_me()
+            show_sys = self.us_chk_sys.get_active()
+            for u in sorted(self.us_data["users"], key=lambda x: x["uid"]):
+                regular = self.us_regular(u)
+                if not (regular or show_sys):
+                    continue
+                if not regular:
+                    state = "rendszerfiók"
+                elif u["locked"]:
+                    state = '<span foreground="#b45309">zárolva</span>'
+                else:
+                    state = "aktív"
+                if u["name"] == me:
+                    state += " (te)"
+                self.us_store.append([u["name"], u["full"], str(u["uid"]), ", ".join([u["group"]] + u["groups"]),
+                                      u["shell"], state])
+            if sel:
+                for row in self.us_store:
+                    if row[0] == sel["name"]:
+                        self.us_tv.get_selection().select_iter(row.iter)
+            self.us_set_sensitivity()
+
+        def us_refresh(self, *_):
+            self.run_task([("user_list", {})], self.us_done)
+
+        def us_done(self, rc, msg, data):
+            if rc == 0 and isinstance(data, dict):
+                self.us_data = data
+                self.us_loaded = True
+                self.us_hint.set_text("✔ Hitelesítve. A módosításokhoz a rendszer újabb jelszót nem kér ebben a munkamenetben.")
+                self.us_auth.set_label("Lista frissítése")
+                self.us_render()
+            elif not self.us_loaded:
+                self.us_hint.set_text("⚠ A hitelesítés nem sikerült, vagy a lista nem tölthető be. Próbáld újra.")
+            self.us_set_sensitivity()
+
+        def us_form(self, user=None):
+            editing = user is not None
+            title = f"Felhasználó szerkesztése: {user['name']}" if editing else "Új felhasználó"
+            d, area = self.xp_dialog(title, "users",
+                                     "A módosítások a mentés után azonnal érvénybe lépnek." if editing
+                                     else "Add meg az új fiók adatait és jogait.",
+                                     "Mentés" if editing else "Létrehozás")
+            d.set_default_size(580, -1)
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            g.set_border_width(16)
+            area.pack_start(g, True, True, 0)
+
+            def row(r, text, w):
+                g.attach(Gtk.Label(label=text, xalign=1), 0, r, 1, 1)
+                w.set_hexpand(True)
+                g.attach(w, 1, r, 1, 1)
+            e_name = Gtk.Entry()
+            e_name.set_placeholder_text("pl. kovacs.janos (kisbetű, szám, _ és -)")
+            e_full = Gtk.Entry()
+            e_full.set_placeholder_text("pl. Kovács János")
+            e_pw, e_pw2 = Gtk.Entry(), Gtk.Entry()
+            for e in (e_pw, e_pw2):
+                e.set_visibility(False)
+            e_pw.set_placeholder_text("(üresen hagyva nem változik)" if editing else "legalább 6 karakter")
+            shells = list(self.us_data.get("shells") or ["/bin/bash"])
+            cur_shell = user["shell"] if editing else "/bin/bash"
+            if cur_shell not in shells:
+                shells.append(cur_shell)
+            cb_shell = Gtk.ComboBoxText()
+            for sh in shells:
+                cb_shell.append_text(sh)
+            cb_shell.set_active(shells.index(cur_shell) if cur_shell in shells else 0)
+            if editing:
+                e_name.set_text(user["name"])
+                e_name.set_sensitive(False)
+                e_full.set_text(user["full"])
+            row(0, "Felhasználónév:", e_name)
+            row(1, "Teljes név:", e_full)
+            row(2, "Jelszó:" if not editing else "Új jelszó:", e_pw)
+            row(3, "Jelszó még egyszer:", e_pw2)
+            row(4, "Parancsértelmező:", cb_shell)
+            chk_lock = Gtk.CheckButton(label="Fiók zárolása (nem tud belépni)")
+            chk_force = Gtk.CheckButton(label="Jelszócsere kötelező a következő belépéskor")
+            chk_home = Gtk.CheckButton(label="Saját mappa létrehozása")
+            chk_home.set_active(True)
+            opts = Gtk.Box(orientation=V, spacing=4)
+            if editing:
+                chk_lock.set_active(user["locked"])
+                opts.pack_start(chk_lock, False, False, 0)
+            else:
+                opts.pack_start(chk_home, False, False, 0)
+            opts.pack_start(chk_force, False, False, 0)
+            g.attach(opts, 1, 5, 1, 1)
+            # --- csoporttagságok (jogok)
+            hl = Gtk.Label(xalign=0)
+            hl.set_markup("<b>Csoporttagságok (jogok)</b>")
+            hl.get_style_context().add_class("xp-head")
+            hl.set_margin_top(6)
+            g.attach(hl, 0, 6, 2, 1)
+            groups = [x for x in self.us_data.get("groups", []) if not (editing and x["name"] == user["group"])]
+            initial = set(user["groups"]) if editing else set()
+            state = {x["name"]: ((x["name"] in initial) if editing else (x["name"] in self.US_DEFAULT_GROUPS))
+                     for x in groups}
+            gstore = Gtk.ListStore(bool, str, str)
+            gtv = Gtk.TreeView(model=gstore)
+            tog = Gtk.CellRendererToggle()
+
+            def on_tog(_c, path):
+                r = gstore[path]
+                r[0] = not r[0]
+                state[r[1]] = r[0]
+            tog.connect("toggled", on_tog)
+            gtv.append_column(Gtk.TreeViewColumn("", tog, active=0))
+            c1 = Gtk.TreeViewColumn("Csoport", Gtk.CellRendererText(), text=1)
+            c1.set_sort_column_id(1)
+            gtv.append_column(c1)
+            gtv.append_column(Gtk.TreeViewColumn("Mire jogosít", Gtk.CellRendererText(), text=2))
+            gsw = Gtk.ScrolledWindow()
+            gsw.get_style_context().add_class("xp-list")
+            gsw.set_min_content_height(190)
+            gsw.add(gtv)
+            g.attach(gsw, 0, 7, 2, 1)
+            chk_all = Gtk.CheckButton(label="Az összes csoport mutatása (a rendszercsoportokat is)")
+            g.attach(chk_all, 0, 8, 2, 1)
+
+            def fill(*_):
+                gstore.clear()
+                for x in sorted(groups, key=lambda y: y["name"]):
+                    n = x["name"]
+                    if chk_all.get_active() or x["gid"] >= US_UID_MIN or n in self.US_GROUP_INFO or state.get(n):
+                        gstore.append([state[n], n, self.US_GROUP_INFO.get(n, "")])
+            chk_all.connect("toggled", fill)
+            fill()
+            err = Gtk.Label(xalign=0)
+            err.set_line_wrap(True)
+            err.set_margin_start(16)
+            err.set_margin_end(16)
+            area.pack_start(err, False, False, 4)
+            d.show_all()
+            while True:
+                if d.run() != Gtk.ResponseType.OK:
+                    d.destroy()
+                    return None
+                name, p1, p2 = e_name.get_text().strip(), e_pw.get_text(), e_pw2.get_text()
+                msg = ""
+                if not editing and not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", name):
+                    msg = "Érvénytelen felhasználónév: kisbetűvel vagy _ jellel kezdődjön, csak kisbetű, szám, _ és - lehet."
+                elif re.search(r"[:,]", e_full.get_text()):
+                    msg = "A teljes név nem tartalmazhat kettőspontot vagy vesszőt."
+                elif (not editing or p1 or p2) and p1 != p2:
+                    msg = "A két jelszó nem egyezik."
+                elif (not editing or p1) and not 6 <= len(p1) <= 128:
+                    msg = "A jelszó legalább 6 karakter legyen."
+                if msg:
+                    err.set_markup(f'<span foreground="#b91c1c">⚠ {msg}</span>')
+                    continue
+                break
+            chosen = {n for n, v in state.items() if v}
+            res = {"name": name, "fullname": e_full.get_text().strip(), "shell": cb_shell.get_active_text(),
+                   "password": p1, "force_change": chk_force.get_active(),
+                   "add_groups": sorted(chosen - initial), "rm_groups": sorted(initial - chosen)}
+            if editing:
+                res["locked"] = chk_lock.get_active()
+            else:
+                res["create_home"] = chk_home.get_active()
+            d.destroy()
+            return res
+
+        def us_new(self, *_):
+            data = self.us_form()
+            if data:
+                self.run_task([("user_add", data)], self.us_done)
+
+        def us_edit(self, *_):
+            u = self.us_selected()
+            if not u or not self.us_regular(u):
+                return
+            data = self.us_form(u)
+            if data:
+                self.run_task([("user_edit", data)], self.us_done)
+
+        def us_delete(self, *_):
+            u = self.us_selected()
+            if not u or not self.us_regular(u) or u["name"] == self.us_me():
+                return
+            d, area = self.xp_dialog("Felhasználó eltávolítása", "users", "", "Eltávolítás")
+            box = Gtk.Box(orientation=V, spacing=10)
+            box.set_border_width(18)
+            l = self.lab(f"Eltávolítod a(z) {u['name']} ({u['full'] or 'név nélkül'}) felhasználót?")
+            chk = Gtk.CheckButton(label=f"A saját mappa ({u['home']}) és a levelek törlése is "
+                                        "(nem vonható vissza)")
+            box.pack_start(l, False, False, 0)
+            box.pack_start(chk, False, False, 0)
+            area.pack_start(box, True, True, 0)
+            d.show_all()
+            ok = d.run() == Gtk.ResponseType.OK
+            rm = chk.get_active()
+            d.destroy()
+            if ok:
+                self.run_task([("user_delete", {"name": u["name"], "remove_home": rm})], self.us_done)
+
+        def us_on_show(self):
+            # ha a segéd már hitelesítve fut (korábbi művelet), a lista jelszó nélkül betölthető
+            p = getattr(self.h, "p", None)
+            if not self.us_loaded and p is not None and p.poll() is None:
+                self.us_refresh()
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
@@ -3045,6 +4248,7 @@ def gui_main(helper=None, run=True):
         # --- Samba-jelszavak
         def sh_setpw(self, user):
             d = Gtk.Dialog(title=f"Samba-jelszó: {user}", transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
             d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Beállítás", Gtk.ResponseType.OK)
             d.set_default_response(Gtk.ResponseType.OK)
             area = d.get_content_area()
