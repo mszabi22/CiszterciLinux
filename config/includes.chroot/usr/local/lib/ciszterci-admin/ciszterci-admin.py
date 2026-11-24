@@ -2208,6 +2208,7 @@ def vpn_direct():
 
 
 KJ_TOOLS = ("xfce4-display-settings", "arandr", "lxrandr")
+FW_BIN = "/usr/local/bin/ciszterci-tuzfal"      # a Ciszterci tűzfal parancsa
 
 
 def kj_tool():
@@ -2381,6 +2382,13 @@ XP_SVG["update"] = ('<circle cx="22" cy="22" r="18" fill="url(#a)" stroke="#0b2a
                     '<path d="M36 41 V31 M31 36 L36 31 L41 36" stroke="#fff" stroke-width="3" fill="none" '
                     'stroke-linecap="round" stroke-linejoin="round"/>')
 XP_FALLBACK_ICON["update"] = "software-update-available"
+XP_SVG["fw"] = ('<rect x="4" y="16" width="40" height="27" fill="#c8502d" stroke="#7a2a12"/>'
+                '<path d="M4 25 H44 M4 34 H44 M16 16 V25 M30 16 V25 M10 25 V34 M23 25 V34 M36 25 V34 M16 34 V43 M30 34 V43" '
+                'stroke="#f3dccb" stroke-width="2" fill="none"/>'
+                '<path d="M24 2 C28 8 34 11 32 18 C31 21 28 22 24 22 C20 22 17 20 18 16 C19 13 22 12 22 9 C22 6 23 4 24 2 Z" '
+                'fill="#ff9a1a" stroke="#c2570a"/>'
+                '<path d="M24 11 C26 14 28 15 27 18 C26 20 22 20 21 18 C21 16 23 15 24 11 Z" fill="#ffe36a"/>')
+XP_FALLBACK_ICON["fw"] = "security-high"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2552,6 +2560,8 @@ def gui_main(helper=None, run=True):
                  "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
                 ("Csomagkezelő", self.page_pkg, "pkg",
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Tűzfal", self.page_firewall, "fw",
+                 "Az iptables tűzfal egyszerű, grafikus kezelése (Ciszterci tűzfal)."),
                 ("Kijelző", self.page_display, "display",
                  "A képernyő beállítása: felbontás, képfrissítés, tájolás, több monitor (kijelzőbeállító)."),
                 ("Vezérlőpult frissítése", self.page_update, "update",
@@ -2562,6 +2572,8 @@ def gui_main(helper=None, run=True):
                  "Helyi felhasználói fiókok: hozzáadás, eltávolítás, csoporttagságok és tulajdonságok szerkesztése.")]
             pages.sort(key=lambda p: hu_key(p[0]))      # az ikonok magyar ABC-sorrendben
             self.pages_meta = pages
+            # közvetlenül indító elemek: (kész-e, indítás); ha nem kész, megnyílik az oldal a teendőkkel
+            self.launchers = {"Tűzfal": (lambda: os.access(FW_BIN, os.X_OK), self.fw_open)}
             self.page_names = []
             self.wg_idx = [p[0] for p in pages].index("WireGuard VPN")
             self.sh_idx = [p[0] for p in pages].index("Mappamegosztás")
@@ -2657,9 +2669,16 @@ def gui_main(helper=None, run=True):
                 it.pack_start(l, False, False, 0)
                 it.set_tooltip_text(desc)
                 fb.add(it)
-            fb.connect("child-activated", lambda _fb, ch: self.go(ch.get_index()))
+            fb.connect("child-activated", lambda _fb, ch: self.open_item(ch.get_index()))
             sw.add(fb)
             return sw
+
+        def open_item(self, idx):
+            ready, action = self.launchers.get(self.pages_meta[idx][0], (None, None))
+            if action and ready():
+                action()
+            else:
+                self.go(idx)
 
         def go(self, idx, record=True):
             if record and idx != self.nav_hist[self.nav_pos]:
@@ -2873,6 +2892,13 @@ def gui_main(helper=None, run=True):
                               else '<span foreground="#b45309">○ nincs telepítve</span>')
                 bi.set_sensitive(not ok)
                 br.set_sensitive(ok)
+            if hasattr(self, "fw_btn"):
+                ok = os.access(FW_BIN, os.X_OK)
+                self.fw_btn.set_sensitive(ok)
+                self.fw_hint.set_text("A tűzfalprogram telepítve van, a gombbal megnyithatod." if ok else
+                                      f"⚠ A tűzfalprogram nincs telepítve ({os.path.basename(FW_BIN)}). Telepítéséhez "
+                                      f"indítsd el egyszer a(z) {os.path.basename(FW_BIN)}.py fájlt: "
+                                      "első indításkor beépül a rendszerbe.")
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
             if hasattr(self, "kj_btn"):
@@ -3822,6 +3848,29 @@ def gui_main(helper=None, run=True):
             except OSError as e:
                 self.say(1, f"Az újraindítás nem sikerült: {e}")
             return False
+
+        # ------------------------------------------------ Tűzfal (ciszterci-tuzfal)
+        def page_firewall(self):
+            b = self.mk_page("Tűzfal", "Az iptables tűzfal egyszerű, grafikus kezelése a Ciszterci tűzfal programmal.")
+            self.head(b, "Tűzfalkezelő")
+            self.fw_hint = self.lab("")
+            b.pack_start(self.fw_hint, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.fw_btn = self.btn("Tűzfal megnyitása", self.fw_open)
+            bar.pack_start(self.fw_btn, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            return b
+
+        def fw_open(self, *_):
+            if not os.access(FW_BIN, os.X_OK):
+                self.say(1, "A tűzfalprogram nincs telepítve.")
+                return
+            try:
+                subprocess.Popen([FW_BIN], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A tűzfalprogram nem indítható: {e}")
+                return
+            self.say(0, "A tűzfalprogram megnyílt (a módosításokhoz a program maga kér jelszót).")
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
