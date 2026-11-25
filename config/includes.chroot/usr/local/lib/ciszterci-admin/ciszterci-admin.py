@@ -467,7 +467,7 @@ def op_login(r):
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
                  "xfce4-settings", "veyon-service", "veyon-configurator",
-                 "xfce4-screensaver"}
+                 "xfce4-screensaver", "light-locker", "light-locker-settings"}
 
 
 def op_pkg(r):
@@ -2211,8 +2211,9 @@ def vpn_direct():
 KJ_TOOLS = ("xfce4-display-settings", "arandr", "lxrandr")
 FW_BIN = "/usr/local/bin/ciszterci-tuzfal"      # a Ciszterci tűzfal parancsa
 SV_TOOLS = (("xfce4-screensaver-preferences", "xfce4-screensaver"),
-            ("xscreensaver-settings", "xscreensaver"),
-            ("light-locker-settings", "light-locker"))      # (beállító program, háttérfolyamat)
+            ("xscreensaver-settings", "xscreensaver"))          # (beállító program, háttérfolyamat)
+SV_PROCS = ("xfce4-screensaver", "xscreensaver", "light-locker")
+SV_LEGACY = ("light-locker", "light-locker-settings")           # az Xfce 4.20 óta nem támogatott, ütközik az újjal
 
 
 def sv_tool():
@@ -2224,15 +2225,18 @@ def sv_tool():
 
 
 def sv_running():
-    for _exe, proc in SV_TOOLS:
+    out = []
+    for proc in SV_PROCS:
         try:
             if subprocess.run(["pgrep", "-x", proc], capture_output=True).returncode == 0:
-                return proc
+                out.append(proc)
         except OSError:
             break
-    return None
+    return out
 
 
+def sv_legacy():
+    return [p for p in SV_LEGACY if pkg_ok(p)]
 
 
 def kj_tool():
@@ -2936,15 +2940,26 @@ def gui_main(helper=None, run=True):
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
             if hasattr(self, "sv_btn"):
-                t = sv_tool()
+                t, legacy, run = sv_tool(), sv_legacy(), sv_running()
                 self.sv_btn.set_sensitive(bool(t))
                 self.sv_inst.set_sensitive(not t)
-                run = sv_running()
-                self.sv_lbl.set_text(f"● A képernyővédő szolgáltatás fut ({run})." if run else
+                self.sv_fix.set_sensitive(bool(legacy) and bool(t))
+                self.sv_lbl.set_text(("● Fut: " + ", ".join(run) + ".") if run else
                                      "○ A képernyővédő szolgáltatás most nem fut (telepítés után a következő "
                                      "bejelentkezéskor indul el).")
+                if legacy and t:
+                    warn = (f"⚠ A(z) {', '.join(legacy)} az {t[1]} mellett ütközhet (dupla zárolás, hibásan működő "
+                            "időzítés). Javasolt eltávolítani: a „light-locker eltávolítása” gomb ezt elvégzi.")
+                elif legacy:
+                    warn = ("⚠ Csak a light-locker van telepítve: az Xfce 4.20 óta ez már nem állítható a "
+                            "beállítóból. Telepítsd az xfce4-screensaver programot, a light-locker ilyenkor "
+                            "eltávolításra kerül.")
+                else:
+                    warn = ""
+                self.sv_warn.set_text(warn)
                 self.sv_hint.set_text(f"A megnyitandó program: {t[0]}." if t else
-                                      "⚠ Nincs képernyővédő-beállító program telepítve: telepítsd az alábbi gombbal.")
+                                      "⚠ Nincs használható képernyővédő-beállító program telepítve: telepítsd az "
+                                      "alábbi gombbal.")
             if hasattr(self, "kj_btn"):
                 tool = kj_tool()
                 self.kj_btn.set_sensitive(bool(tool))
@@ -3923,15 +3938,16 @@ def gui_main(helper=None, run=True):
             self.head(b, "Állapot")
             self.sv_lbl = self.lab("")
             b.pack_start(self.sv_lbl, False, False, 0)
+            self.sv_warn = self.lab("")
+            b.pack_start(self.sv_warn, False, False, 0)
             self.head(b, "Beállítás")
             self.sv_hint = self.lab("")
             b.pack_start(self.sv_hint, False, False, 0)
             bar = Gtk.Box(spacing=8)
             self.sv_btn = self.btn("Képernyővédő beállításainak megnyitása", self.sv_open)
-            self.sv_inst = self.btn("Képernyővédő telepítése",
-                                    lambda *_: self.run_task([("pkg", {"action": "install",
-                                                                       "pkgs": ["xfce4-screensaver"]})]))
-            for w in (self.sv_btn, self.sv_inst):
+            self.sv_inst = self.btn("Képernyővédő telepítése", self.sv_install)
+            self.sv_fix = self.btn("light-locker eltávolítása", self.sv_remove_legacy)
+            for w in (self.sv_btn, self.sv_inst, self.sv_fix):
                 bar.pack_start(w, False, False, 0)
             b.pack_start(bar, False, False, 0)
             return b
@@ -3947,6 +3963,23 @@ def gui_main(helper=None, run=True):
                 self.say(1, f"A beállító nem indítható: {e}")
                 return
             self.say(0, "A képernyővédő beállításai megnyíltak.")
+
+        def sv_install(self, *_):
+            legacy = sv_legacy()
+            text = "Telepítem az xfce4-screensaver csomagot (képernyővédő és képernyőzár)?"
+            steps = [("pkg", {"action": "install", "pkgs": ["xfce4-screensaver"]})]
+            if legacy:
+                text += (f"\n\nA(z) {', '.join(legacy)} el lesz távolítva, mert a két program együtt ütközik "
+                         "(dupla zárolás, nem állítható időzítés).")
+                steps.append(("pkg", {"action": "remove", "pkgs": legacy}))
+            if self.confirm(text):
+                self.run_task(steps)
+
+        def sv_remove_legacy(self, *_):
+            legacy = sv_legacy()
+            if legacy and self.confirm(f"Eltávolítom a(z) {', '.join(legacy)} csomagot?\n\nAz xfce4-screensaver "
+                                       "marad az egyetlen képernyővédő és képernyőzár."):
+                self.run_task([("pkg", {"action": "remove", "pkgs": legacy})])
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
