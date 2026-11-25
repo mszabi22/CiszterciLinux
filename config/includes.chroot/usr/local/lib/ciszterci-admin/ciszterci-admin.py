@@ -466,7 +466,8 @@ def op_login(r):
 
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
-                 "xfce4-settings", "veyon-service", "veyon-configurator"}
+                 "xfce4-settings", "veyon-service", "veyon-configurator",
+                 "xfce4-screensaver"}
 
 
 def op_pkg(r):
@@ -2209,6 +2210,29 @@ def vpn_direct():
 
 KJ_TOOLS = ("xfce4-display-settings", "arandr", "lxrandr")
 FW_BIN = "/usr/local/bin/ciszterci-tuzfal"      # a Ciszterci tűzfal parancsa
+SV_TOOLS = (("xfce4-screensaver-preferences", "xfce4-screensaver"),
+            ("xscreensaver-settings", "xscreensaver"),
+            ("light-locker-settings", "light-locker"))      # (beállító program, háttérfolyamat)
+
+
+def sv_tool():
+    """Az első telepített képernyővédő-beállító: (parancs, folyamatnév) vagy None."""
+    for exe, proc in SV_TOOLS:
+        if shutil.which(exe):
+            return exe, proc
+    return None
+
+
+def sv_running():
+    for _exe, proc in SV_TOOLS:
+        try:
+            if subprocess.run(["pgrep", "-x", proc], capture_output=True).returncode == 0:
+                return proc
+        except OSError:
+            break
+    return None
+
+
 
 
 def kj_tool():
@@ -2389,6 +2413,14 @@ XP_SVG["fw"] = ('<rect x="4" y="16" width="40" height="27" fill="#c8502d" stroke
                 'fill="#ff9a1a" stroke="#c2570a"/>'
                 '<path d="M24 11 C26 14 28 15 27 18 C26 20 22 20 21 18 C21 16 23 15 24 11 Z" fill="#ffe36a"/>')
 XP_FALLBACK_ICON["fw"] = "security-high"
+XP_SVG["screensaver"] = ('<rect x="7" y="5" width="34" height="24" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+                        '<rect x="10" y="8" width="28" height="18" fill="#12205a" stroke="#0b1440"/>'
+                        '<path d="M27 11 A7 7 0 1 0 33 21 A5.5 5.5 0 1 1 27 11 Z" fill="#ffe36a"/>'
+                        '<circle cx="15" cy="12" r="1" fill="#fff"/><circle cx="21" cy="21" r="1" fill="#fff"/>'
+                        '<circle cx="34" cy="12" r="1" fill="#fff"/>'
+                        '<rect x="20" y="29" width="8" height="5" fill="#a8a493"/>'
+                        '<rect x="13" y="34" width="22" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>')
+XP_FALLBACK_ICON["screensaver"] = "preferences-desktop-screensaver"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2562,6 +2594,8 @@ def gui_main(helper=None, run=True):
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
                 ("Tűzfal", self.page_firewall, "fw",
                  "Az iptables tűzfal egyszerű, grafikus kezelése (Ciszterci tűzfal)."),
+                ("Képernyővédő", self.page_screensaver, "screensaver",
+                 "A képernyővédő és a képernyőzár beállítása (indulási idő, megjelenés, zárolás)."),
                 ("Kijelző", self.page_display, "display",
                  "A képernyő beállítása: felbontás, képfrissítés, tájolás, több monitor (kijelzőbeállító)."),
                 ("Vezérlőpult frissítése", self.page_update, "update",
@@ -2901,6 +2935,16 @@ def gui_main(helper=None, run=True):
                                       "első indításkor beépül a rendszerbe.")
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
+            if hasattr(self, "sv_btn"):
+                t = sv_tool()
+                self.sv_btn.set_sensitive(bool(t))
+                self.sv_inst.set_sensitive(not t)
+                run = sv_running()
+                self.sv_lbl.set_text(f"● A képernyővédő szolgáltatás fut ({run})." if run else
+                                     "○ A képernyővédő szolgáltatás most nem fut (telepítés után a következő "
+                                     "bejelentkezéskor indul el).")
+                self.sv_hint.set_text(f"A megnyitandó program: {t[0]}." if t else
+                                      "⚠ Nincs képernyővédő-beállító program telepítve: telepítsd az alábbi gombbal.")
             if hasattr(self, "kj_btn"):
                 tool = kj_tool()
                 self.kj_btn.set_sensitive(bool(tool))
@@ -3871,6 +3915,38 @@ def gui_main(helper=None, run=True):
                 self.say(1, f"A tűzfalprogram nem indítható: {e}")
                 return
             self.say(0, "A tűzfalprogram megnyílt (a módosításokhoz a program maga kér jelszót).")
+
+        # ------------------------------------------------ Képernyővédő (xfce4-screensaver)
+        def page_screensaver(self):
+            b = self.mk_page("Képernyővédő",
+                             "A képernyővédő és a képernyőzár beállítása: indulási idő, megjelenés, zárolás.")
+            self.head(b, "Állapot")
+            self.sv_lbl = self.lab("")
+            b.pack_start(self.sv_lbl, False, False, 0)
+            self.head(b, "Beállítás")
+            self.sv_hint = self.lab("")
+            b.pack_start(self.sv_hint, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.sv_btn = self.btn("Képernyővédő beállításainak megnyitása", self.sv_open)
+            self.sv_inst = self.btn("Képernyővédő telepítése",
+                                    lambda *_: self.run_task([("pkg", {"action": "install",
+                                                                       "pkgs": ["xfce4-screensaver"]})]))
+            for w in (self.sv_btn, self.sv_inst):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            return b
+
+        def sv_open(self, *_):
+            t = sv_tool()
+            if not t:
+                self.say(1, "Nincs képernyővédő-beállító program telepítve: előbb telepítsd.")
+                return
+            try:
+                subprocess.Popen([t[0]], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A beállító nem indítható: {e}")
+                return
+            self.say(0, "A képernyővédő beállításai megnyíltak.")
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
