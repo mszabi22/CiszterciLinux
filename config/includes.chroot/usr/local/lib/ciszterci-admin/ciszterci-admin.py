@@ -466,7 +466,7 @@ def op_login(r):
 
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
-                 "xfce4-settings"}
+                 "xfce4-settings", "veyon-service"}
 
 
 def op_pkg(r):
@@ -4022,6 +4022,11 @@ def gui_main(helper=None, run=True):
                          "A GitHub legfrissebb hivatalos kiadását tölti le (az ellenőrző összeget ellenőrzi, "
                          "ha a kiadás tartalmazza).",
                          "rustdesk", [("deb", {"kind": "rustdesk"})], [("debremove", {"kind": "rustdesk"})])
+            self.pkg_row(b, "Veyon Service",
+                         "A Veyon kliensszolgáltatás a Debian-tárolóból: a tanári gép (Veyon Master) ennek "
+                         "segítségével látja és kezelheti távolról ezt a gépet.",
+                         "veyon-service", [("pkg", {"action": "install", "pkgs": ["veyon-service"]})],
+                         [("pkg", {"action": "remove", "pkgs": ["veyon-service"]})])
             return b
 
         # ------------------------------------------------------ Felhő tárhely
