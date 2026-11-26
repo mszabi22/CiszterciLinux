@@ -1,11 +1,11 @@
 #!/bin/bash
-# apps-telepito – grafikus programtelepítő a /usr/local/bin/apps mappához
+# apps-telepito – grafikus programtelepítő és -eltávolító a /usr/local/bin/apps mappához
 # Debian 13 + Xfce | függőségek: zenity, polkit (pkexec)
 #
 # Támogatott fájltípusok az APPS_DIR-ben:
-#   *.deb        -> apt-get install (függőségekkel együtt), root jog kell (pkexec)
-#   *.sh         -> root-ként lefuttatott telepítő script (pkexec)
-#   *.AppImage   -> felhasználói szintű telepítés (~/.local/opt + menüelem)
+#   *.deb        -> apt-get install / remove (függőségekkel együtt), root jog kell (pkexec)
+#   *.sh         -> root-ként lefuttatott telepítő / eltávolító (pkexec)
+#   *.AppImage   -> felhasználói szintű telepítés / eltávolítás (~/.local/opt + menüelem)
 #
 # Opcionális "szép nevek" fájl: $APPS_DIR/names.txt
 #   fájlnév | Megjelenő név | Rövid leírás
@@ -13,7 +13,7 @@
 
 APPS_DIR="/usr/local/bin/apps"
 NAMES_FILE="$APPS_DIR/names.txt"
-TITLE="MyApps - Programtelepítő"
+TITLE="MyApps - Programkezelő"
 SELF="$(readlink -f "$0")"
 
 trim() {
@@ -25,26 +25,33 @@ trim() {
 
 slugify() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_'; }
 
-############################################################
-# ROOT RÉSZ – pkexec-en keresztül hívódik: apps-telepito --root-install <fájlnév>
-############################################################
-root_install() {
-    local f="$1" path p
+is_pkg_installed() {
+    local pkg="$1"
+    [[ -n "$pkg" ]] && dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"
+}
+
+check_security_root() {
+    local f="$1" path="$APPS_DIR/$1" p
     if [[ -z "$f" || "$f" == */* ]]; then
         echo "Érvénytelen fájlnév." >&2; exit 2
     fi
-    path="$APPS_DIR/$f"
     if [[ ! -f "$path" || -L "$path" ]]; then
         echo "Nincs ilyen fájl: $f" >&2; exit 2
     fi
-    # Biztonság: a mappa és a fájl csak rooté lehet, és más nem írhatja
     for p in "$APPS_DIR" "$path" "$SELF"; do
         if [[ "$(stat -c %u "$p")" != 0 ]] || [[ "$(stat -c %a "$p")" =~ ([2367][0-7]|[0-7][2367])$ ]]; then
             echo "Biztonsági hiba: $p nem rooté, vagy mások is írhatják." >&2
             exit 3
         fi
     done
+}
 
+############################################################
+# ROOT RÉSZ – pkexec-en keresztül hívódik
+############################################################
+root_install() {
+    local f="$1" path="$APPS_DIR/$1"
+    check_security_root "$f"
     export DEBIAN_FRONTEND=noninteractive
     case "${f,,}" in
         *.deb) apt-get install -y "$path" ;;
@@ -53,8 +60,51 @@ root_install() {
     esac
 }
 
+root_remove() {
+    local f="$1" path="$APPS_DIR/$1" pkg
+    check_security_root "$f"
+    export DEBIAN_FRONTEND=noninteractive
+    case "${f,,}" in
+        *.deb)
+            pkg="$(dpkg-deb -f "$path" Package 2>/dev/null)"
+            [[ -n "$pkg" ]] || { echo "Nem sikerült kiolvasni a csomagnevet." >&2; exit 1; }
+            apt-get remove -y "$pkg"
+            ;;
+        *.sh)
+            case "$f" in
+                pycharm-install.sh)
+                    rm -rf /opt/pycharm-* /usr/local/bin/pycharm /usr/share/applications/pycharm.desktop /usr/share/icons/pycharm-logo.*
+                    ;;
+                vs_code-install.sh)
+                    apt-get remove -y code
+                    ;;
+                xampp-install.sh)
+                    if [[ -x /opt/lampp/lampp ]]; then
+                        /opt/lampp/lampp stop >/dev/null 2>&1 || true
+                    fi
+                    if [[ -x /opt/lampp/uninstall ]]; then
+                        /opt/lampp/uninstall --mode unattended >/dev/null 2>&1 || true
+                    fi
+                    rm -rf /opt/lampp /usr/share/applications/xampp.desktop /usr/share/icons/xampp-logo.*
+                    sed -i '/\/opt\/lampp\/manager-linux-x64\.run/d' /etc/sudoers
+                    ;;
+                *)
+                    echo "Ehhez a .sh fájlhoz nincs automatikus eltávolító definiálva: $f" >&2
+                    exit 2
+                    ;;
+            esac
+            ;;
+        *)
+            echo "Nem támogatott fájltípus: $f" >&2; exit 2
+            ;;
+    esac
+}
+
 if [[ "$1" == "--root-install" ]]; then
     root_install "$2"
+    exit $?
+elif [[ "$1" == "--root-remove" ]]; then
+    root_remove "$2"
     exit $?
 fi
 
@@ -70,7 +120,6 @@ if [[ ! -d "$APPS_DIR" ]]; then
     exit 1
 fi
 
-# --- szép nevek betöltése ---
 declare -A NAME DESC
 if [[ -r "$NAMES_FILE" ]]; then
     while IFS='|' read -r file name desc; do
@@ -86,10 +135,26 @@ is_installed() {
     case "${f,,}" in
         *.deb)
             pkg="$(dpkg-deb -f "$path" Package 2>/dev/null)"
-            [[ -n "$pkg" ]] && dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"
+            is_pkg_installed "$pkg"
             ;;
         *.appimage)
             [[ -f "$HOME/.local/share/applications/apps-telepito-$(slugify "${f%.*}").desktop" ]]
+            ;;
+        *.sh)
+            case "$f" in
+                pycharm-install.sh)
+                    [[ -e /usr/local/bin/pycharm || -f /usr/share/applications/pycharm.desktop ]]
+                    ;;
+                vs_code-install.sh)
+                    is_pkg_installed "code"
+                    ;;
+                xampp-install.sh)
+                    [[ -d /opt/lampp || -f /usr/share/applications/xampp.desktop ]]
+                    ;;
+                *)
+                    return 1
+                    ;;
+            esac
             ;;
         *) return 1 ;;
     esac
@@ -113,67 +178,94 @@ Categories=Utility;
 EOF
 }
 
-install_one() {
-    local f="$1"
-    echo "=== $f ==="
-    case "${f,,}" in
-        *.appimage)  install_appimage "$f" ;;
-        *.deb|*.sh)  pkexec "$SELF" --root-install "$f" ;;
-        *) echo "Nem támogatott fájltípus: $f"; return 1 ;;
-    esac
+remove_appimage() {
+    local f="$1" slug dest desktop_file
+    slug="$(slugify "${f%.*}")"
+    dest="$HOME/.local/opt/apps-telepito/$f"
+    desktop_file="$HOME/.local/share/applications/apps-telepito-$slug.desktop"
+    rm -f "$dest" "$desktop_file"
 }
 
-# --- lista összeállítása ---
-rows=()
-shopt -s nullglob nocaseglob
-for path in "$APPS_DIR"/*.deb "$APPS_DIR"/*.sh "$APPS_DIR"/*.AppImage; do
-    f="${path##*/}"
-    name="${NAME[$f]:-${f%.*}}"
-    desc="${DESC[$f]}"
-    if is_installed "$f"; then
-        name="✔ $name"
-        desc="${desc:+$desc  }(már telepítve)"
+run_action() {
+    local action="$1" f="$2"
+    echo "=== $action: $f ==="
+    if [[ "$action" == "install" ]]; then
+        case "${f,,}" in
+            *.appimage)  install_appimage "$f" ;;
+            *.deb|*.sh)  pkexec "$SELF" --root-install "$f" ;;
+            *) echo "Nem támogatott fájltípus: $f"; return 1 ;;
+        esac
+    elif [[ "$action" == "remove" ]]; then
+        case "${f,,}" in
+            *.appimage)  remove_appimage "$f" ;;
+            *.deb|*.sh)  pkexec "$SELF" --root-remove "$f" ;;
+            *) echo "Nem támogatott fájltípus: $f"; return 1 ;;
+        esac
     fi
-    rows+=(FALSE "$name" "$desc" "$f")
-done
-shopt -u nullglob nocaseglob
+}
 
-if ((${#rows[@]} == 0)); then
-    zenity --info --title="$TITLE" --text="Nincs telepíthető program a(z) $APPS_DIR mappában."
-    exit 0
-fi
+while true; do
+    rows=()
+    shopt -s nullglob nocaseglob
+    for path in "$APPS_DIR"/*.deb "$APPS_DIR"/*.sh "$APPS_DIR"/*.AppImage; do
+        f="${path##*/}"
+        name="${NAME[$f]:-${f%.*}}"
+        desc="${DESC[$f]}"
+        if is_installed "$f"; then
+            status="✔ Telepítve"
+            action_label="Eltávolítás"
+        else
+            status="✘ Nincs telepítve"
+            action_label="Telepítés"
+        fi
+        rows+=("$status" "$action_label" "$name" "$desc" "$f")
+    done
+    shopt -u nullglob nocaseglob
 
-selected="$(zenity --list --checklist \
-    --title="$TITLE" --width=750 --height=500 \
-    --text="Jelöld be a telepíteni kívánt programokat:" \
-    --column="" --column="Program" --column="Leírás" --column="Fájl" \
-    --hide-column=4 --print-column=4 --separator='/' \
-    --ok-label="Telepítés" --cancel-label="Kilépés" \
-    "${rows[@]}")" || exit 0
-[[ -z "$selected" ]] && exit 0
-IFS='/' read -ra files <<< "$selected"
+    if ((${#rows[@]} == 0)); then
+        zenity --info --title="$TITLE" --text="Nincs kezelhető program a(z) $APPS_DIR mappában."
+        exit 0
+    fi
 
-# --- telepítés ---
-log="$(mktemp)"
-ok=(); fail=()
-for f in "${files[@]}"; do
-    label="${NAME[$f]:-${f%.*}}"
-    install_one "$f" >>"$log" 2>&1 &
+    picked="$(zenity --list \
+        --title="$TITLE" --width=820 --height=500 \
+        --text="Válassz ki egy programot a telepítéséhez vagy eltávolításához:" \
+        --column="Állapot" --column="Művelet" --column="Program" --column="Leírás" --column="Fájl" \
+        --hide-column=5 --print-column=5 \
+        --ok-label="Kiválasztás" --cancel-label="Kilépés" \
+        "${rows[@]}")" || exit 0
+
+    [[ -z "$picked" ]] && continue
+
+    label="${NAME[$picked]:-${picked%.*}}"
+    if is_installed "$picked"; then
+        action="remove"
+        verb_past="eltávolítva"
+        verb_ing="Eltávolítás folyamatban"
+        confirm_text="A(z) <b>$label</b> jelenleg telepítve van.\nBiztosan el szeretnéd távolítani?"
+    else
+        action="install"
+        verb_past="telepítve"
+        verb_ing="Telepítés folyamatban"
+        confirm_text="A(z) <b>$label</b> még nincs telepítve.\nSzeretnéd most telepíteni?"
+    fi
+
+    zenity --question --title="$TITLE" --text="$confirm_text" \
+        --ok-label="Igen" --cancel-label="Mégse" || continue
+
+    log="$(mktemp)"
+    run_action "$action" "$picked" >"$log" 2>&1 &
     pid=$!
     tail --pid="$pid" -f /dev/null 2>/dev/null | zenity --progress --pulsate --auto-close --no-cancel \
-        --title="$TITLE" --width=400 --text="Telepítés folyamatban: $label ..." || true
-    if wait "$pid"; then ok+=("$label"); else fail+=("$label"); fi
+        --title="$TITLE" --width=420 --text="$verb_ing: $label ..." || true
+
+    if wait "$pid"; then
+        zenity --info --title="$TITLE" --width=400 \
+            --text="Sikeresen $verb_past:\n • $label"
+    else
+        zenity --warning --title="$TITLE" --width=400 \
+            --text="A művelet sikertelen volt:\n • $label"
+        zenity --text-info --title="$TITLE – részletek" --filename="$log" --width=700 --height=400
+    fi
+    rm -f "$log"
 done
-
-# --- eredmény ---
-msg=""
-((${#ok[@]}))   && msg+="Sikeresen telepítve:\n$(printf ' • %s\n' "${ok[@]}")\n"
-((${#fail[@]})) && msg+="\nSikertelen:\n$(printf ' • %s\n' "${fail[@]}")"
-
-if ((${#fail[@]})); then
-    zenity --warning --title="$TITLE" --text="$msg" --width=400
-    zenity --text-info --title="$TITLE – részletek" --filename="$log" --width=700 --height=400
-else
-    zenity --info --title="$TITLE" --text="$msg" --width=400
-fi
-rm -f "$log"
