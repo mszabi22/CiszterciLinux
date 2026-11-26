@@ -467,7 +467,7 @@ def op_login(r):
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
                  "xfce4-settings", "veyon-service", "veyon-configurator",
-                 "xfce4-screensaver", "light-locker", "light-locker-settings", "tcplay"}
+                 "xfce4-screensaver", "light-locker", "light-locker-settings", "tcplay", "age"}
 
 
 def op_pkg(r):
@@ -2204,7 +2204,7 @@ def tc_friendly(out):
     return "A tcplay hibát jelzett: " + " | ".join(lines[-3:])[:300]
 
 
-def tc_pty_run(argv, secret="", max_pw=1, yes=False, idle_prompt=25):
+def tc_pty_run(argv, secret="", max_pw=1, yes=False, idle_prompt=25, log=None):
     """A tcplay futtatása álterminálon: a jelszót és az igen-megerősítést a program kérdéseire adjuk meg
     (a jelszó soha nem kerül parancssorba vagy naplóba). Visszatérés: (kilépési kód, maszkolt kimenet)."""
     import pty, select, signal
@@ -2232,7 +2232,7 @@ def tc_pty_run(argv, secret="", max_pw=1, yes=False, idle_prompt=25):
                 if nl >= logged:
                     for ln in re.split(r"[\r\n]+", out[logged:nl]):
                         if ln.strip():
-                            hlog(tc_mask(ln.strip(), secret))
+                            (log or hlog)(tc_mask(ln.strip(), secret))
                     logged = nl + 1
             lastline = out[scanned:].rsplit("\n", 1)[-1]
             if re.search(r"(?i)pass(?:phrase|word)[^\n]*:\s*$", lastline):
@@ -2553,6 +2553,189 @@ def op_tc_create(r):
                            f"A „Kötetek” fülön a Lecsatlakoztatás gombbal lezárhatod ({tmpname}). Az adat nem sérült.")
     tc_detach(loop)
     return "A titkosított kötet elkészült. Csatlakoztatni a „Kötetek” fülön lehet."
+
+
+# ------------------------------------------------------------ age (fájl- és mappatitkosítás, root nélkül)
+AGE_RECIP_RE = re.compile(r"^(age1[a-z0-9]{10,}|ssh-(ed25519|rsa) [A-Za-z0-9+/=]+(\s.*)?)$")
+
+
+def age_bin(name="age"):
+    exe = shutil.which(name)
+    if not exe:
+        raise RuntimeError(f"A(z) {name} nincs telepítve.")
+    return exe
+
+
+def age_friendly(out, killed_hint=""):
+    low = out.lower()
+    if "incorrect passphrase" in low:
+        return "Hibás jelszó."
+    if "no identity matched" in low:
+        return "A megadott kulcs nem tudja visszafejteni ezt a fájlt."
+    if "not an age file" in low or "parsing age header" in low or "failed to read header" in low:
+        return "Ez nem age-fájl, vagy sérült."
+    if killed_hint and "nem fogadható el" in out:
+        return killed_hint
+    lines = [x.strip() for x in re.split(r"[\r\n]+", out) if x.strip() and not re.search(r"(?i)pass(phrase|word).*:\s*$", x)]
+    return "Az age hibát jelzett: " + " | ".join(lines[-3:])[:300]
+
+
+def age_pass(p, minlen=1):
+    p = p if isinstance(p, str) else ""
+    if len(p) < minlen:
+        raise RuntimeError(f"A jelszó legalább {minlen} karakter legyen.")
+    if len(p.encode("utf-8")) > 256 or re.search(r"[\x00-\x1f\x7f]", p):
+        raise RuntimeError("A jelszó legfeljebb 256 bájt lehet, vezérlőkarakter nélkül.")
+    return p
+
+
+def age_abs(p, what="elérési út"):
+    if not isinstance(p, str) or not p.startswith("/"):
+        raise RuntimeError(f"Adj meg teljes {what}.")
+    return os.path.normpath(p)
+
+
+def age_encrypt(src, out, passphrase=None, recipients=None, armor=False, log=None):
+    """Fájl vagy mappa titkosítása. A mappából előbb tar-archívum készül. Visszatérés: a kimeneti fájl."""
+    import tempfile, tarfile
+    age = age_bin()
+    src, out = age_abs(src, "forrásútvonalat"), age_abs(out, "kimeneti útvonalat")
+    if not os.path.exists(src):
+        raise RuntimeError("A titkosítandó fájl vagy mappa nem található.")
+    if os.path.lexists(out):
+        raise RuntimeError("A kimeneti fájl már létezik, a program nem ír felül meglévő fájlt.")
+    outdir = os.path.dirname(out)
+    if not os.path.isdir(outdir):
+        raise RuntimeError("A kimeneti mappa nem létezik.")
+    if passphrase is not None:
+        passphrase = age_pass(passphrase, 8)
+    else:
+        lines = [x.strip() for x in (recipients or []) if x.strip() and not x.strip().startswith("#")]
+        if not lines:
+            raise RuntimeError("Adj meg legalább egy nyilvános kulcsot (címzettet).")
+        for x in lines:
+            if not AGE_RECIP_RE.match(x):
+                raise RuntimeError(f"Ez nem érvényes nyilvános kulcs: {x[:60]}")
+    tmp_tar = tmp_rec = None
+    try:
+        data = src
+        if os.path.isdir(src):
+            fd, tmp_tar = tempfile.mkstemp(prefix=".age-", suffix=".tar", dir=outdir)
+            os.close(fd)
+            if log:
+                log("A mappa becsomagolása…")
+            with tarfile.open(tmp_tar, "w") as t:
+                t.add(src, arcname=os.path.basename(src))
+            data = tmp_tar
+        args = [age] + (["-a"] if armor else [])
+        if passphrase is not None:
+            args.append("-p")
+        else:
+            fd, tmp_rec = tempfile.mkstemp(prefix=".age-rec-")
+            with os.fdopen(fd, "w") as f:
+                f.write("\n".join(lines) + "\n")
+            args += ["-R", tmp_rec]
+        args += ["-o", out, data]
+        rc, o = tc_pty_run(args, passphrase or "", max_pw=2 if passphrase is not None else 0, log=log)
+        if rc != 0:
+            raise RuntimeError(age_friendly(o))
+    except Exception:
+        if os.path.lexists(out):
+            os.remove(out)
+        raise
+    finally:
+        for f in (tmp_tar, tmp_rec):
+            if f and os.path.exists(f):
+                os.remove(f)
+    return out
+
+
+def age_untar(tar_path, dest):
+    """Biztonságos kicsomagolás: nem enged abszolút útvonalat, '..'-ot, eszközfájlt, és nem ír felül semmit."""
+    import tarfile
+    dest = os.path.realpath(dest)
+    with tarfile.open(tar_path, "r") as t:
+        members = t.getmembers()
+        tops = set()
+        for m in members:
+            parts = m.name.split("/")
+            if m.name.startswith("/") or ".." in parts or m.isdev():
+                raise RuntimeError("Az archívum veszélyes elemet tartalmaz, ezért nem csomagolom ki.")
+            tops.add(parts[0])
+        for top in tops:
+            if os.path.lexists(os.path.join(dest, top)):
+                raise RuntimeError(f"A célhelyen már létezik ilyen nevű elem: {top}")
+        kw = {"filter": "data"} if hasattr(tarfile, "data_filter") else {}
+        t.extractall(dest, members=members, **kw)
+    return sorted(tops)
+
+
+def age_decrypt(src, target, passphrase=None, identity=None, ident_pass="", as_dir=False, log=None):
+    """Visszafejtés. as_dir=False: target a kimeneti fájl; as_dir=True: target a célmappa (a tar-archívum kicsomagolódik)."""
+    import tempfile, tarfile
+    age = age_bin()
+    src, target = age_abs(src, "forrásútvonalat"), age_abs(target, "kimeneti útvonalat")
+    if not os.path.isfile(src):
+        raise RuntimeError("A visszafejtendő fájl nem található.")
+    if identity is not None:
+        identity = age_abs(identity, "kulcsfájl-útvonalat")
+        if not os.path.isfile(identity):
+            raise RuntimeError("A kulcsfájl nem található.")
+    elif passphrase is None:
+        raise RuntimeError("Adj meg jelszót vagy kulcsfájlt.")
+    if as_dir:
+        if not os.path.isdir(target):
+            raise RuntimeError("A célmappa nem létezik.")
+        fd, out = tempfile.mkstemp(prefix=".age-", suffix=".tar", dir=target)
+        os.close(fd)
+        os.remove(out)                                      # az age maga hozza létre
+    else:
+        out = target
+        if os.path.lexists(out):
+            raise RuntimeError("A kimeneti fájl már létezik, a program nem ír felül meglévő fájlt.")
+        if not os.path.isdir(os.path.dirname(out)):
+            raise RuntimeError("A kimeneti mappa nem létezik.")
+    secret = passphrase if passphrase is not None else (ident_pass or "")
+    args = [age, "-d"] + (["-i", identity] if identity else []) + ["-o", out, src]
+    try:
+        rc, o = tc_pty_run(args, secret, max_pw=1 if secret else 0, log=log)
+        if rc != 0:
+            raise RuntimeError(age_friendly(o, "A kulcsfájl jelszóval védett: add meg a jelszavát."))
+        if as_dir:
+            if not tarfile.is_tarfile(out):
+                raise RuntimeError("A visszafejtett adat nem mappa-archívum. Válaszd a „Fájl” tartalmat.")
+            tops = age_untar(out, target)
+            return os.path.join(target, tops[0]) if len(tops) == 1 else target
+        return out
+    except Exception:
+        if not as_dir and os.path.lexists(out):
+            os.remove(out)
+        raise
+    finally:
+        if as_dir and os.path.exists(out):
+            os.remove(out)
+
+
+def age_keygen(out):
+    exe = age_bin("age-keygen")
+    out = age_abs(out, "kulcsfájl-útvonalat")
+    if os.path.lexists(out):
+        raise RuntimeError("Ez a fájl már létezik, a program nem ír felül meglévő kulcsot.")
+    p = subprocess.run([exe, "-o", out], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("Az age-keygen hibát jelzett: " + p.stderr.strip()[:200])
+    os.chmod(out, 0o600)
+    m = re.search(r"(age1[a-z0-9]+)", p.stderr + p.stdout)
+    return m.group(1) if m else ""
+
+
+def age_pubkey(identity):
+    exe = age_bin("age-keygen")
+    identity = age_abs(identity, "kulcsfájl-útvonalat")
+    p = subprocess.run([exe, "-y", identity], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("A nyilvános kulcs nem olvasható ki (hibás vagy jelszóval védett kulcsfájl).")
+    return p.stdout.strip()
 
 
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
@@ -3069,7 +3252,7 @@ def gui_main(helper=None, run=True):
                 ("Csomagkezelő", self.page_pkg, "pkg",
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
                 ("Titkosítás", self.page_crypto, "crypto",
-                 "Titkosított kötetek (TrueCrypt-kompatibilis) létrehozása és csatlakoztatása a tcplay programmal."),
+                 "Titkosított kötetek (tcplay), valamint fájlok és mappák titkosítása (age)."),
                 ("Tűzfal", self.page_firewall, "fw",
                  "Az iptables tűzfal egyszerű, grafikus kezelése (Ciszterci tűzfal)."),
                 ("Képernyővédő", self.page_screensaver, "screensaver",
@@ -3415,7 +3598,8 @@ def gui_main(helper=None, run=True):
                 self.up_show_installed()
             if hasattr(self, "cr_store"):
                 self.cr_reload()
-                self.cr_hint.set_text("⚠ A tcplay nincs telepítve: előbb telepítsd a fenti gombbal." if not self.cr_have() else
+                self.ag_sens()
+                self.cr_hint.set_text("⚠ A tcplay nincs telepítve (a titkosított kötetekhez): telepítsd a fenti gombbal." if not self.cr_have() else
                                       "A tcplay TrueCrypt-kompatibilis köteteket kezel; az újabb VeraCrypt-kötetek nem "
                                       "biztos, hogy támogatottak. A jelszót csak a művelet idejére kapja meg a program.")
             if hasattr(self, "sv_btn"):
@@ -4463,8 +4647,8 @@ def gui_main(helper=None, run=True):
         # ------------------------------------------------ Titkosítás (tcplay)
         def page_crypto(self):
             b = self.mk_page("Titkosítás",
-                             "TrueCrypt-kompatibilis titkosított kötetek (fájl-konténer vagy lemez) létrehozása, "
-                             "csatlakoztatása és lezárása a tcplay programmal.")
+                             "TrueCrypt-kompatibilis titkosított kötetek (fájl-konténer vagy lemez) kezelése a tcplay "
+                             "programmal, valamint fájlok és mappák titkosítása az age programmal.")
             self.pkg_row(b, "tcplay", "A tcplay program a Debian-tárolóból.", "tcplay",
                          [("pkg", {"action": "install", "pkgs": ["tcplay"]})],
                          [("pkg", {"action": "remove", "pkgs": ["tcplay"]})])
@@ -4473,6 +4657,7 @@ def gui_main(helper=None, run=True):
             nb = Gtk.Notebook()
             nb.append_page(self.cr_tab_volumes(), Gtk.Label(label="Kötetek"))
             nb.append_page(self.cr_tab_create(), Gtk.Label(label="Új kötet létrehozása"))
+            nb.append_page(self.cr_tab_age(), Gtk.Label(label="Fájl és mappa (age)"))
             b.pack_start(nb, True, True, 0)
             self.cr_keys = []
             self.cr_reload()
@@ -4880,6 +5065,347 @@ def gui_main(helper=None, run=True):
             if ok:
                 self.say(1, "A beírt név nem egyezik az eszköz nevével: a művelet megszakítva.")
             return None
+
+        # ------------------------------------------------ age: fájl- és mappatitkosítás
+        def ag_sens(self):
+            ok = self.ag_have()
+            for w in (self.ag_b_enc, self.ag_b_dec, self.ag_b_gen, self.ag_b_pub):
+                w.set_sensitive(ok)
+
+        def ag_have(self):
+            return shutil.which("age") is not None and shutil.which("age-keygen") is not None
+
+        def run_local(self, fn, cb=None):
+            """Helyi (root nélküli) művelet háttérszálon, ugyanazzal a folyamatjelzéssel, mint a rendszergazdai feladatoknál."""
+            if self.busy:
+                return False
+            self.busy = True
+            self.stack.set_sensitive(False)
+            self.progress.show()
+            self.status.set_text("Folyamatban…")
+            GLib.timeout_add(120, self.pulse)
+
+            def worker():
+                try:
+                    rc, msg = 0, fn()
+                except Exception as e:  # noqa: BLE001
+                    rc, msg = 1, str(e)
+                GLib.idle_add(self.task_done, rc, msg, cb, None)
+            threading.Thread(target=worker, daemon=True).start()
+            return True
+
+        def ag_choose(self, title, mode, default=None):
+            """mode: open | save | dir. Visszatérés: útvonal vagy None."""
+            act = {"open": Gtk.FileChooserAction.OPEN, "save": Gtk.FileChooserAction.SAVE,
+                   "dir": Gtk.FileChooserAction.SELECT_FOLDER}[mode]
+            d = Gtk.FileChooserDialog(title=title, transient_for=self, action=act)
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Kiválasztás", Gtk.ResponseType.OK)
+            if mode == "save":
+                d.set_do_overwrite_confirmation(True)
+                if default:
+                    d.set_current_folder(os.path.dirname(default))
+                    d.set_current_name(os.path.basename(default))
+            res = d.get_filename() if d.run() == Gtk.ResponseType.OK else None
+            d.destroy()
+            return res
+
+        def ag_path_row(self, g, r, text, entry, mode, ph=""):
+            entry.set_placeholder_text(ph)
+            row = Gtk.Box(spacing=6)
+            row.pack_start(entry, True, True, 0)
+
+            def browse(*_):
+                p = self.ag_choose(text, mode)
+                if p:
+                    entry.set_text(p)
+            row.pack_start(self.btn("Tallózás…", browse), False, False, 0)
+            g.attach(Gtk.Label(label=text + ":", xalign=1), 0, r, 1, 1)
+            row.set_hexpand(True)
+            g.attach(row, 1, r, 1, 1)
+            return row
+
+        def cr_tab_age(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            self.pkg_row(v, "age", "Az age egyszerű, modern fájltitkosító a Debian-tárolóból.", "age",
+                         [("pkg", {"action": "install", "pkgs": ["age"]})],
+                         [("pkg", {"action": "remove", "pkgs": ["age"]})])
+            v.pack_start(self.lab("Fájlok és mappák titkosítása jelszóval vagy kulccsal. Nem kell hozzá rendszergazdai "
+                                  "jelszó, a program a saját jogaiddal dolgozik. A mappák .tar.age fájlba kerülnek."),
+                         False, False, 0)
+            nb = Gtk.Notebook()
+            nb.append_page(self.ag_tab_encrypt(), Gtk.Label(label="Titkosítás"))
+            nb.append_page(self.ag_tab_decrypt(), Gtk.Label(label="Visszafejtés"))
+            nb.append_page(self.ag_tab_keys(), Gtk.Label(label="Kulcsok"))
+            v.pack_start(nb, True, True, 0)
+            return v
+
+        # --- titkosítás
+        def ag_tab_encrypt(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            v.pack_start(g, False, False, 0)
+            self.ag_e_file = Gtk.RadioButton.new_with_label_from_widget(None, "Fájl")
+            self.ag_e_dir = Gtk.RadioButton.new_with_label_from_widget(self.ag_e_file, "Mappa")
+            kb = Gtk.Box(spacing=14)
+            kb.pack_start(self.ag_e_file, False, False, 0)
+            kb.pack_start(self.ag_e_dir, False, False, 0)
+            g.attach(Gtk.Label(label="Mit titkosítsunk:", xalign=1), 0, 0, 1, 1)
+            g.attach(kb, 1, 0, 1, 1)
+            self.ag_e_src = Gtk.Entry()
+
+            def browse_src(*_):
+                p = self.ag_choose("Titkosítandó " + ("fájl" if self.ag_e_file.get_active() else "mappa"),
+                                   "open" if self.ag_e_file.get_active() else "dir")
+                if p:
+                    self.ag_e_src.set_text(p)
+            row = Gtk.Box(spacing=6)
+            row.pack_start(self.ag_e_src, True, True, 0)
+            row.pack_start(self.btn("Tallózás…", browse_src), False, False, 0)
+            self.ag_e_src.set_placeholder_text("/elérési/út")
+            g.attach(Gtk.Label(label="Elérési út:", xalign=1), 0, 1, 1, 1)
+            row.set_hexpand(True)
+            g.attach(row, 1, 1, 1, 1)
+            self.ag_e_pw_rb = Gtk.RadioButton.new_with_label_from_widget(None, "Jelszóval")
+            self.ag_e_key_rb = Gtk.RadioButton.new_with_label_from_widget(self.ag_e_pw_rb, "Nyilvános kulccsal (címzettnek)")
+            mb = Gtk.Box(spacing=14)
+            mb.pack_start(self.ag_e_pw_rb, False, False, 0)
+            mb.pack_start(self.ag_e_key_rb, False, False, 0)
+            g.attach(Gtk.Label(label="Mód:", xalign=1), 0, 2, 1, 1)
+            g.attach(mb, 1, 2, 1, 1)
+            self.ag_e_pw1, self.ag_e_pw2 = Gtk.Entry(), Gtk.Entry()
+            for e in (self.ag_e_pw1, self.ag_e_pw2):
+                e.set_visibility(False)
+            self.ag_e_pw1.set_placeholder_text("legalább 8 karakter")
+            for r, (t, w) in enumerate((("Jelszó:", self.ag_e_pw1), ("Jelszó még egyszer:", self.ag_e_pw2)), start=3):
+                g.attach(Gtk.Label(label=t, xalign=1), 0, r, 1, 1)
+                w.set_hexpand(True)
+                g.attach(w, 1, r, 1, 1)
+            self.ag_e_rec = Gtk.TextView()
+            self.ag_e_rec.set_wrap_mode(Gtk.WrapMode.CHAR)
+            rs = Gtk.ScrolledWindow()
+            rs.get_style_context().add_class("xp-list")
+            rs.set_min_content_height(70)
+            rs.add(self.ag_e_rec)
+
+            def load_rec(*_):
+                p = self.ag_choose("Nyilvános kulcsokat tartalmazó fájl", "open")
+                if p:
+                    try:
+                        with open(p, encoding="utf-8") as f:
+                            txt = f.read(65536)
+                    except (OSError, UnicodeDecodeError) as e:
+                        self.say(1, f"A fájl nem olvasható: {e}")
+                        return
+                    buf = self.ag_e_rec.get_buffer()
+                    buf.set_text((buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False) + "\n" + txt).strip())
+            rbox = Gtk.Box(orientation=V, spacing=4)
+            rbox.pack_start(rs, True, True, 0)
+            rbox.pack_start(self.btn("Kulcsok betöltése fájlból…", load_rec), False, False, 0)
+            self.ag_e_recbox = rbox
+            g.attach(Gtk.Label(label="Nyilvános kulcsok\n(soronként egy):", xalign=1), 0, 5, 1, 1)
+            rbox.set_hexpand(True)
+            g.attach(rbox, 1, 5, 1, 1)
+            self.ag_e_out = Gtk.Entry()
+            self.ag_path_row(g, 6, "Kimeneti fájl", self.ag_e_out, "save",
+                             "üresen hagyva: a forrás neve + .age (mappánál .tar.age)")
+            self.ag_e_armor = Gtk.CheckButton(label="Szöveges (ASCII) kimenet, pl. e-mailben küldhető")
+            g.attach(self.ag_e_armor, 1, 7, 1, 1)
+
+            def mode_changed(*_):
+                pw = self.ag_e_pw_rb.get_active()
+                for w in (self.ag_e_pw1, self.ag_e_pw2):
+                    w.set_sensitive(pw)
+                self.ag_e_recbox.set_sensitive(not pw)
+            self.ag_e_pw_rb.connect("toggled", mode_changed)
+            mode_changed()
+            self.ag_b_enc = self.btn("Titkosítás", self.ag_encrypt)
+            v.pack_start(self.ag_b_enc, False, False, 0)
+            v.pack_start(self.lab("A jelszó nélkül (vagy a titkos kulcsfájl nélkül) az adat nem állítható vissza: jegyezd "
+                                  "meg jól, vagy mentsd el biztonságos helyre. Meglévő fájlt a program nem ír felül."),
+                         False, False, 0)
+            return v
+
+        def ag_encrypt(self, *_):
+            src = self.ag_e_src.get_text().strip()
+            pw_mode = self.ag_e_pw_rb.get_active()
+            p1, p2 = self.ag_e_pw1.get_text(), self.ag_e_pw2.get_text()
+            buf = self.ag_e_rec.get_buffer()
+            recips = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False).splitlines()
+            msg = ""
+            if not src:
+                msg = "Add meg a titkosítandó fájl vagy mappa útvonalát."
+            elif pw_mode and p1 != p2:
+                msg = "A két jelszó nem egyezik."
+            elif pw_mode and len(p1) < 8:
+                msg = "A jelszó legalább 8 karakter legyen."
+            elif not pw_mode and not any(x.strip() and not x.strip().startswith("#") for x in recips):
+                msg = "Adj meg legalább egy nyilvános kulcsot."
+            if msg:
+                self.say(1, msg)
+                return
+            is_dir = os.path.isdir(src)
+            out = self.ag_e_out.get_text().strip() or (src.rstrip("/") + (".tar.age" if is_dir else ".age"))
+            armor = self.ag_e_armor.get_active()
+            self.ag_e_pw1.set_text("")
+            self.ag_e_pw2.set_text("")
+            log = lambda m: GLib.idle_add(self.log, m)
+            self.run_local(lambda: "Titkosítva: " + age_encrypt(src, out, passphrase=p1 if pw_mode else None,
+                                                                recipients=None if pw_mode else recips,
+                                                                armor=armor, log=log))
+
+        # --- visszafejtés
+        def ag_tab_decrypt(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            v.pack_start(g, False, False, 0)
+            self.ag_d_src = Gtk.Entry()
+            row = self.ag_path_row(g, 0, "Titkosított fájl", self.ag_d_src, "open", "/elérési/út/fajl.age")
+            self.ag_d_src.connect("changed", lambda *_: self.ag_d_dir.set_active(True)
+                                  if self.ag_d_src.get_text().strip().endswith(".tar.age") else self.ag_d_file.set_active(True))
+            self.ag_d_file = Gtk.RadioButton.new_with_label_from_widget(None, "Fájl")
+            self.ag_d_dir = Gtk.RadioButton.new_with_label_from_widget(self.ag_d_file, "Mappa (.tar.age)")
+            kb = Gtk.Box(spacing=14)
+            kb.pack_start(self.ag_d_file, False, False, 0)
+            kb.pack_start(self.ag_d_dir, False, False, 0)
+            g.attach(Gtk.Label(label="Tartalma:", xalign=1), 0, 1, 1, 1)
+            g.attach(kb, 1, 1, 1, 1)
+            self.ag_d_pw_rb = Gtk.RadioButton.new_with_label_from_widget(None, "Jelszóval")
+            self.ag_d_key_rb = Gtk.RadioButton.new_with_label_from_widget(self.ag_d_pw_rb, "Kulcsfájllal")
+            mb = Gtk.Box(spacing=14)
+            mb.pack_start(self.ag_d_pw_rb, False, False, 0)
+            mb.pack_start(self.ag_d_key_rb, False, False, 0)
+            g.attach(Gtk.Label(label="Mód:", xalign=1), 0, 2, 1, 1)
+            g.attach(mb, 1, 2, 1, 1)
+            self.ag_d_pw = Gtk.Entry()
+            self.ag_d_pw.set_visibility(False)
+            g.attach(Gtk.Label(label="Jelszó:", xalign=1), 0, 3, 1, 1)
+            self.ag_d_pw.set_hexpand(True)
+            g.attach(self.ag_d_pw, 1, 3, 1, 1)
+            self.ag_d_key = Gtk.Entry()
+            self.ag_d_keyrow = self.ag_path_row(g, 4, "Kulcsfájl", self.ag_d_key, "open", "/elérési/út/key.txt")
+            self.ag_d_kpw = Gtk.Entry()
+            self.ag_d_kpw.set_visibility(False)
+            self.ag_d_kpw.set_placeholder_text("csak ha a kulcsfájl jelszóval védett")
+            g.attach(Gtk.Label(label="Kulcsfájl jelszava:", xalign=1), 0, 5, 1, 1)
+            self.ag_d_kpw.set_hexpand(True)
+            g.attach(self.ag_d_kpw, 1, 5, 1, 1)
+            self.ag_d_out = Gtk.Entry()
+            self.ag_d_out.set_placeholder_text("üresen hagyva: a titkosított fájl mellé")
+            orow = Gtk.Box(spacing=6)
+            orow.pack_start(self.ag_d_out, True, True, 0)
+
+            def browse_out(*_):
+                if self.ag_d_dir.get_active():
+                    p = self.ag_choose("Célmappa", "dir")
+                else:
+                    src = self.ag_d_src.get_text().strip()
+                    p = self.ag_choose("Kimeneti fájl", "save", src[:-4] if src.endswith(".age") else None)
+                if p:
+                    self.ag_d_out.set_text(p)
+            orow.pack_start(self.btn("Tallózás…", browse_out), False, False, 0)
+            g.attach(Gtk.Label(label="Kimenet (fájl vagy célmappa):", xalign=1), 0, 6, 1, 1)
+            orow.set_hexpand(True)
+            g.attach(orow, 1, 6, 1, 1)
+
+            def mode_changed(*_):
+                pw = self.ag_d_pw_rb.get_active()
+                self.ag_d_pw.set_sensitive(pw)
+                self.ag_d_keyrow.set_sensitive(not pw)
+                self.ag_d_kpw.set_sensitive(not pw)
+            self.ag_d_pw_rb.connect("toggled", mode_changed)
+            mode_changed()
+            self.ag_b_dec = self.btn("Visszafejtés", self.ag_decrypt)
+            v.pack_start(self.ag_b_dec, False, False, 0)
+            v.pack_start(self.lab("Mappa esetén a kimenet a célmappa: a visszafejtett mappa ebbe kerül kicsomagolva. "
+                                  "Meglévő fájlt vagy mappát a program nem ír felül."), False, False, 0)
+            return v
+
+        def ag_decrypt(self, *_):
+            src = self.ag_d_src.get_text().strip()
+            pw_mode = self.ag_d_pw_rb.get_active()
+            as_dir = self.ag_d_dir.get_active()
+            key = self.ag_d_key.get_text().strip()
+            pw, kpw = self.ag_d_pw.get_text(), self.ag_d_kpw.get_text()
+            msg = ""
+            if not src:
+                msg = "Add meg a visszafejtendő fájl útvonalát."
+            elif pw_mode and not pw:
+                msg = "Add meg a jelszót."
+            elif not pw_mode and not key:
+                msg = "Add meg a kulcsfájlt."
+            if msg:
+                self.say(1, msg)
+                return
+            out = self.ag_d_out.get_text().strip()
+            if not out:
+                out = os.path.dirname(src) if as_dir else (src[:-4] if src.endswith(".age") else src + ".dec")
+            self.ag_d_pw.set_text("")
+            self.ag_d_kpw.set_text("")
+            log = lambda m: GLib.idle_add(self.log, m)
+            self.run_local(lambda: "Visszafejtve: " + age_decrypt(
+                src, out, passphrase=pw if pw_mode else None, identity=None if pw_mode else key,
+                ident_pass=kpw, as_dir=as_dir, log=log))
+
+        # --- kulcsok
+        def ag_tab_keys(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            v.pack_start(self.lab("Az age-kulcspárnak két része van: a titkos kulcsot (kulcsfájl) senkinek ne add oda, és "
+                                  "őrizd meg biztonságban. A nyilvános kulcsot (age1…) szabadon megoszthatod: aki ezzel "
+                                  "titkosít neked, azt csak a te kulcsfájlod fejti vissza."), False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.ag_b_gen = self.btn("Új kulcspár készítése…", self.ag_keygen)
+            self.ag_b_pub = self.btn("Nyilvános kulcs kiolvasása kulcsfájlból…", self.ag_pubkey)
+            for w in (self.ag_b_gen, self.ag_b_pub):
+                bar.pack_start(w, False, False, 0)
+            v.pack_start(bar, False, False, 0)
+            return v
+
+        def ag_show_key(self, title, text):
+            d, area = self.xp_dialog(title, "crypto", "", "OK")
+            box = Gtk.Box(orientation=V, spacing=10)
+            box.set_border_width(18)
+            l = Gtk.Label(label=text, xalign=0)
+            l.set_selectable(True)
+            l.set_line_wrap(True)
+            l.set_line_wrap_mode(2)
+            l.set_max_width_chars(70)
+            box.pack_start(l, False, False, 0)
+
+            def copy(*_):
+                from gi.repository import Gdk
+                Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text.splitlines()[-1] if "\n" in text else text, -1)
+                self.say(0, "A nyilvános kulcs a vágólapra másolva.")
+            box.pack_start(self.btn("Nyilvános kulcs másolása", copy), False, False, 0)
+            area.pack_start(box, True, True, 0)
+            d.show_all()
+            d.run()
+            d.destroy()
+
+        def ag_keygen(self, *_):
+            default = os.path.join(os.path.expanduser("~"), "age-kulcs.txt")
+            path = self.ag_choose("Hová mentsem a titkos kulcsfájlt?", "save", default)
+            if not path:
+                return
+
+            def done(rc, msg, data):
+                if rc == 0:
+                    self.ag_show_key("Új age-kulcspár",
+                                     f"A titkos kulcsfájl elkészült:\n{path}\n\nA nyilvános kulcsod:\n{msg}")
+            self.run_local(lambda: age_keygen(path), done)
+
+        def ag_pubkey(self, *_):
+            path = self.ag_choose("Kulcsfájl", "open")
+            if not path:
+                return
+
+            def done(rc, msg, data):
+                if rc == 0:
+                    self.ag_show_key("Nyilvános kulcs", msg)
+            self.run_local(lambda: age_pubkey(path), done)
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
