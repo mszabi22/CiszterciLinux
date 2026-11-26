@@ -467,7 +467,7 @@ def op_login(r):
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
                  "xfce4-settings", "veyon-service", "veyon-configurator",
-                 "xfce4-screensaver", "light-locker", "light-locker-settings"}
+                 "xfce4-screensaver", "light-locker", "light-locker-settings", "tcplay"}
 
 
 def op_pkg(r):
@@ -2089,6 +2089,472 @@ def op_self_rollback(r):
     return "Az előző verzió visszaállítva."
 
 
+# ------------------------------------------------------------ titkosítás (tcplay)
+TC_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+TC_STATE = f"/run/{APP_NAME}-crypt.json"          # a megnyitott kötetek listája (jelszót nem tartalmaz)
+TC_CIPHERS = ("AES-256-XTS", "TWOFISH-256-XTS", "SERPENT-256-XTS", "AES-256-XTS,TWOFISH-256-XTS",
+              "AES-256-XTS,TWOFISH-256-XTS,SERPENT-256-XTS")
+TC_HASHES = ("RIPEMD160", "SHA512", "whirlpool")
+TC_FS = {"ext4": ("mkfs.ext4", ["-F"], "-L"), "exfat": ("mkfs.exfat", [], "-L"),
+         "vfat": ("mkfs.vfat", ["-F", "32"], "-n"), "ntfs": ("mkfs.ntfs", ["-f"], "-L")}
+TC_MOUNT_ROOTS = ("/media/", "/mnt/", "/home/")
+TC_MAPPER = "/dev/mapper/"                              # (tesztekhez felülírható)
+TC_MAX_PASS = 64                                  # a TrueCrypt-formátum jelszóhossz-határa
+
+
+def sbin_which(name):
+    """Mint a shutil.which, de a /usr/sbin és /sbin is számít (a normál felhasználó PATH-jában nincsenek ott)."""
+    return shutil.which(name, path=os.environ.get("PATH", "") + ":/usr/local/sbin:/usr/sbin:/sbin")
+
+
+def tc_bin():
+    exe = sbin_which("tcplay")
+    if not exe:
+        raise RuntimeError("A tcplay nincs telepítve.")
+    return exe
+
+
+def tc_state_read():
+    """A megnyitott kötetek (root nélkül is olvasható); csak a ténylegesen létező leképezések."""
+    try:
+        with open(TC_STATE, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    return {n: v for n, v in d.items() if isinstance(v, dict) and os.path.exists(TC_MAPPER + n)}
+
+
+def tc_state_write(d):
+    tmp = TC_STATE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, TC_STATE)
+
+
+def tc_name(n):
+    if not isinstance(n, str) or not TC_NAME_RE.match(n):
+        raise RuntimeError("Érvénytelen név: betű, szám, _ és - lehet, legfeljebb 32 karakter.")
+    return n
+
+
+def tc_pass(p, allow_empty=False, minlen=1):
+    p = p if isinstance(p, str) else ""
+    if not p:
+        if allow_empty:
+            return ""
+        raise RuntimeError("Jelszó vagy kulcsfájl megadása kötelező.")
+    if len(p.encode("utf-8")) > TC_MAX_PASS or re.search(r"[\x00-\x1f\x7f]", p):
+        raise RuntimeError(f"A jelszó legfeljebb {TC_MAX_PASS} bájt lehet, vezérlőkarakter nélkül.")
+    if len(p) < minlen:
+        raise RuntimeError(f"A jelszó legalább {minlen} karakter legyen.")
+    return p
+
+
+def tc_keyfiles(lst):
+    out = []
+    for k in lst or []:
+        if not isinstance(k, str) or not k.startswith("/") or not os.path.isfile(k):
+            raise RuntimeError(f"A kulcsfájl nem található: {k}")
+        out.append(k)
+    if len(out) > 16:
+        raise RuntimeError("Legfeljebb 16 kulcsfájl adható meg.")
+    return out
+
+
+def tc_path(p):
+    import stat
+    if not isinstance(p, str) or not p.startswith("/"):
+        raise RuntimeError("Adj meg egy teljes elérési utat.")
+    real = os.path.realpath(p)
+    try:
+        mode = os.stat(real).st_mode
+    except OSError:
+        raise RuntimeError(f"Nem található: {p}")
+    if not (stat.S_ISREG(mode) or stat.S_ISBLK(mode)):
+        raise RuntimeError("Csak fájl-konténer vagy lemez/partíció használható.")
+    return real
+
+
+def tc_mountpoint(mp, name):
+    if not mp:
+        u = invoking_user()
+        mp = f"/media/{u}/{name}" if u else f"/mnt/{name}"
+    mp = os.path.normpath(mp)
+    if ".." in mp.split("/") or not mp.startswith(TC_MOUNT_ROOTS):
+        raise RuntimeError("A csatlakozási pont a /media, /mnt vagy /home alatt lehet.")
+    if os.path.ismount(mp) or (os.path.isdir(mp) and os.listdir(mp)):
+        raise RuntimeError("A csatlakozási pont nem üres vagy már használatban van.")
+    return mp
+
+
+def tc_mask(text, secret):
+    if secret and len(secret) >= 4:
+        text = text.replace(secret, "***")
+    return text
+
+
+def tc_friendly(out):
+    low = out.lower()
+    if "incorrect" in low or ("password" in low and "not a" in low):
+        return "Hibás jelszó vagy kulcsfájl, vagy a forrás nem TrueCrypt-kompatibilis kötet."
+    lines = [x.strip() for x in re.split(r"[\r\n]+", out) if x.strip() and not re.search(r"(?i)pass(phrase|word).*:\s*$", x)]
+    return "A tcplay hibát jelzett: " + " | ".join(lines[-3:])[:300]
+
+
+def tc_pty_run(argv, secret="", max_pw=1, yes=False, idle_prompt=25):
+    """A tcplay futtatása álterminálon: a jelszót és az igen-megerősítést a program kérdéseire adjuk meg
+    (a jelszó soha nem kerül parancssorba vagy naplóba). Visszatérés: (kilépési kód, maszkolt kimenet)."""
+    import pty, select, signal
+    pid, fd = pty.fork()
+    if pid == 0:
+        try:
+            os.execvpe(argv[0], argv, dict(os.environ, LC_ALL="C"))
+        except OSError:
+            pass
+        os._exit(127)
+    out, scanned, logged, sent, last, killed = "", 0, 0, 0, time.time(), ""
+    try:
+        while True:
+            r, _, _ = select.select([fd], [], [], 1.0)
+            if r:
+                try:
+                    chunk = os.read(fd, 4096)
+                except OSError:
+                    chunk = b""
+                if not chunk:
+                    break
+                last = time.time()
+                out += chunk.decode("utf-8", "replace").replace("\r\n", "\n")
+                nl = out.rfind("\n")
+                if nl >= logged:
+                    for ln in re.split(r"[\r\n]+", out[logged:nl]):
+                        if ln.strip():
+                            hlog(tc_mask(ln.strip(), secret))
+                    logged = nl + 1
+            lastline = out[scanned:].rsplit("\n", 1)[-1]
+            if re.search(r"(?i)pass(?:phrase|word)[^\n]*:\s*$", lastline):
+                if sent < max_pw:
+                    os.write(fd, (secret + "\n").encode("utf-8"))
+                    sent += 1
+                    scanned = len(out)
+                else:
+                    killed = "A jelszó nem fogadható el (a program újra kérte)."
+                    os.kill(pid, signal.SIGTERM)
+                    break
+            elif yes and re.search(r"(?i)(\(y/n\)|\[y/n\]|\(yes/no\)|\[yes/no\])\s*:?\s*$", lastline):
+                os.write(fd, b"y\n")
+                scanned = len(out)
+            elif lastline and re.search(r"[:?\)\]]\s*$", lastline) and time.time() - last > idle_prompt:
+                killed = f"Ismeretlen kérdés a tcplay-től: {lastline.strip()[:80]}"
+                os.kill(pid, signal.SIGTERM)
+                break
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+    _, status = os.waitpid(pid, 0)
+    rc = os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1
+    out = tc_mask(out, secret)
+    if killed:
+        return 1, killed + "\n" + out
+    return rc, out
+
+
+def tc_attach(path, ro):
+    """Fájl-konténer esetén loop-eszköz (a tcplay blokkeszközt vár). Visszatérés: (eszköz, loop vagy None)."""
+    import stat
+    mode = os.stat(path).st_mode
+    if stat.S_ISBLK(mode):
+        return path, None
+    p = subprocess.run(["losetup", "--find", "--show"] + (["--read-only"] if ro else []) + [path],
+                       capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError("A fájl nem csatolható loop-eszközként: " + p.stderr.strip()[:150])
+    loop = p.stdout.strip()
+    return loop, loop
+
+
+def tc_detach(loop):
+    if loop:
+        hrun(["losetup", "-d", loop], check=False)
+
+
+def tc_user_ids():
+    """A programot indító (nem root) felhasználó (uid, gid) azonosítója, vagy (None, None)."""
+    u = invoking_user()
+    try:
+        e = pwd.getpwnam(u) if u else None
+    except KeyError:
+        e = None
+    return (e.pw_uid, e.pw_gid) if e else (None, None)
+
+
+TC_OWNER_FS = ("ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs")      # POSIX-jogú fájlrendszerek: a gyökér tulajdonosa számít
+
+
+def tc_unmap(tc, name, tries=12):
+    """A leképezés lezárása. Frissen formázott vagy lecsatolt eszközt az udev még egy darabig vizsgálhat
+    (ilyenkor "foglalt" a hiba), ezért megvárjuk a csendet és néhányszor újrapróbáljuk."""
+    udev = sbin_which("udevadm")
+    if udev:
+        subprocess.run([udev, "settle", "--timeout=10"], capture_output=True)
+    for i in range(tries):
+        p = subprocess.run([tc, f"--unmap={name}"], capture_output=True, text=True)
+        if p.returncode == 0 or not os.path.exists(TC_MAPPER + name):
+            hlog(f"A(z) {name} leképezés lezárva.")
+            return True
+        if i == 0:
+            hlog(f"A(z) {name} leképezés még foglalt, újrapróbálom…")
+        time.sleep(0.5)
+    return False
+
+
+def tc_map_args(tc, name, dev, keyfiles, pw):
+    return ([tc, f"--map={name}", f"--device={dev}"] + [f"--keyfile={k}" for k in keyfiles]
+            + (["--prompt-passphrase"] if keyfiles and pw else []))
+
+
+def tc_mount(name, mp, ro, uid, gid):
+    dev = TC_MAPPER + name
+    for _ in range(50):
+        if os.path.exists(dev):
+            break
+        time.sleep(0.1)
+    p = subprocess.run(["blkid", "-o", "value", "-s", "TYPE", dev], capture_output=True, text=True)
+    fs = p.stdout.strip()
+    if not fs:
+        raise RuntimeError("A kötetben nincs felismerhető fájlrendszer. Új kötetet a létrehozás formáz meg.")
+    created = not os.path.isdir(mp)
+    if created:
+        os.makedirs(mp, mode=0o755)
+    opts = ["nosuid", "nodev", "ro" if ro else "rw"]
+    if fs in ("vfat", "exfat", "ntfs"):
+        opts += [f"uid={uid}", f"gid={gid}", "umask=022"]
+    hrun(["mount", "-o", ",".join(opts), dev, mp])
+    return fs, created
+
+
+def op_tc_open(r):
+    tc = tc_bin()
+    name = tc_name(r.get("name"))
+    src = tc_path(r.get("path"))
+    ro = bool(r.get("readonly"))
+    keyfiles = tc_keyfiles(r.get("keyfiles"))
+    pw = tc_pass(r.get("passphrase"), allow_empty=bool(keyfiles))
+    mp = tc_mountpoint(r.get("mountpoint"), name)
+    if os.path.exists(TC_MAPPER + name):
+        raise RuntimeError("Már van ilyen nevű leképezés, adj meg másik nevet.")
+    u = invoking_user()
+    try:
+        pw_ent = pwd.getpwnam(u) if u else None
+    except KeyError:
+        pw_ent = None
+    uid, gid = (pw_ent.pw_uid, pw_ent.pw_gid) if pw_ent else (0, 0)
+    undo = []
+    try:
+        dev, loop = tc_attach(src, ro)
+        if loop:
+            undo.insert(0, lambda: tc_detach(loop))
+        rc, out = tc_pty_run(tc_map_args(tc, name, dev, keyfiles, pw), pw, max_pw=1 if pw else 0)
+        if rc != 0:
+            raise RuntimeError(tc_friendly(out))
+        undo.insert(0, lambda: tc_unmap(tc, name))
+        if ro:
+            hrun(["blockdev", "--setro", TC_MAPPER + name], check=False)
+        fs, created = tc_mount(name, mp, ro, uid, gid)
+        if r.get("take_owner", True) and not ro and uid and fs in TC_OWNER_FS:
+            try:
+                if os.stat(mp).st_uid == 0:
+                    os.chown(mp, uid, gid)
+                    hlog(f"A kötet gyökérmappájának tulajdonosa mostantól: {u}.")
+            except OSError as e:
+                hlog(f"A tulajdonos beállítása nem sikerült: {e}")
+    except Exception:
+        for fn in undo:
+            try:
+                fn()
+            except Exception:  # noqa: BLE001
+                pass
+        raise
+    st = tc_state_read()
+    st[name] = {"source": src, "loop": loop, "mount": mp, "ro": ro, "fs": fs, "created_mp": created}
+    tc_state_write(st)
+    return f"A kötet csatlakoztatva: {mp} ({fs}{', csak olvasható' if ro else ''})."
+
+
+def op_tc_close(r):
+    tc = tc_bin()
+    name = tc_name(r.get("name"))
+    st = tc_state_read()
+    ent = st.get(name, {})
+    mp = ent.get("mount")
+    if not mp:                                         # nem általunk megnyitott: keressük a csatolást
+        try:
+            with open("/proc/mounts", encoding="utf-8") as f:
+                for line in f:
+                    p = line.split()
+                    if p and p[0] == TC_MAPPER + name:
+                        mp = p[1].replace("\\040", " ")
+        except OSError:
+            pass
+    if not os.path.exists(TC_MAPPER + name):
+        st.pop(name, None)
+        tc_state_write(st)
+        raise RuntimeError("Ez a kötet már nincs megnyitva.")
+    if mp and os.path.ismount(mp):
+        rc = hrun(["umount", mp], check=False)
+        if rc != 0:
+            raise RuntimeError("A kötet használatban van (nyitott fájl vagy mappa): zárd be, majd próbáld újra.")
+    if not tc_unmap(tc, name):
+        raise RuntimeError("A kötet lecsatolva, de a leképezés még foglalt (más folyamat használja az eszközt). "
+                           "Próbáld újra néhány másodperc múlva.")
+    tc_detach(ent.get("loop"))
+    if ent.get("created_mp") and mp:
+        try:
+            os.rmdir(mp)
+        except OSError:
+            pass
+    st.pop(name, None)
+    tc_state_write(st)
+    return f"A(z) {name} kötet lecsatlakoztatva és lezárva."
+
+
+def op_tc_info(r):
+    tc = tc_bin()
+    src = tc_path(r.get("path"))
+    keyfiles = tc_keyfiles(r.get("keyfiles"))
+    pw = tc_pass(r.get("passphrase"), allow_empty=bool(keyfiles))
+    dev, loop = tc_attach(src, True)
+    try:
+        args = [tc, "--info", f"--device={dev}"] + [f"--keyfile={k}" for k in keyfiles]
+        if keyfiles and pw:
+            args.append("--prompt-passphrase")
+        rc, out = tc_pty_run(args, pw, max_pw=1 if pw else 0)
+    finally:
+        tc_detach(loop)
+    if rc != 0:
+        raise RuntimeError(tc_friendly(out))
+    text = "\n".join(x for x in out.splitlines() if x.strip() and not re.search(r"(?i)pass(phrase|word).*:\s*$", x))
+    return "Kötetinformáció lekérdezve.", {"info": text}
+
+
+def tc_block_device_ok(path, confirm):
+    import stat
+    if not isinstance(path, str) or not path.startswith("/dev/"):
+        raise RuntimeError("Adj meg egy /dev/ alatti lemezt vagy partíciót.")
+    real = os.path.realpath(path)
+    try:
+        if not stat.S_ISBLK(os.stat(real).st_mode):
+            raise RuntimeError("Ez nem blokkeszköz.")
+    except OSError:
+        raise RuntimeError("Az eszköz nem található.")
+    if confirm not in (path, real):
+        raise RuntimeError("A megerősítés nem egyezik az eszköz nevével: a művelet megszakítva.")
+    t = subprocess.run(["lsblk", "-dnro", "TYPE", real], capture_output=True, text=True)
+    if t.returncode != 0 or t.stdout.strip() not in ("disk", "part"):
+        raise RuntimeError("Csak lemez vagy partíció formázható titkosított kötetnek.")
+    m = subprocess.run(["lsblk", "-nro", "MOUNTPOINT", real], capture_output=True, text=True)
+    if m.returncode != 0 or any(x.strip() for x in m.stdout.splitlines()):
+        raise RuntimeError("Az eszköz (vagy egy partíciója) használatban van: csatolva vagy swap. Nem formázom.")
+    holders = f"/sys/class/block/{os.path.basename(real)}/holders"
+    if os.path.isdir(holders) and os.listdir(holders):
+        raise RuntimeError("Az eszközt egy másik kötet (LVM, titkosítás vagy RAID) használja. Nem formázom.")
+    return real
+
+
+def op_tc_create(r):
+    tc = tc_bin()
+    kind = r.get("kind")
+    pw = tc_pass(r.get("passphrase"), minlen=8)
+    keyfiles = tc_keyfiles(r.get("keyfiles"))
+    cipher, hsh = r.get("cipher") or "", r.get("hash") or ""
+    if cipher and cipher not in TC_CIPHERS:
+        raise RuntimeError("Ismeretlen titkosító.")
+    if hsh and hsh not in TC_HASHES:
+        raise RuntimeError("Ismeretlen kivonatoló algoritmus.")
+    fs = r.get("fs")
+    if fs not in TC_FS:
+        raise RuntimeError("Ismeretlen fájlrendszer.")
+    mkfs, mk_extra, lab_opt = TC_FS[fs]
+    if not sbin_which(mkfs):
+        raise RuntimeError(f"A(z) {mkfs} nincs telepítve, ezért ezt a fájlrendszert nem tudom létrehozni.")
+    label = re.sub(r"[^A-Za-z0-9_. -]", "", str(r.get("label") or ""))[:11 if fs == "vfat" else 16]
+    fast = bool(r.get("fast"))
+    created_file, loop, tmpname = None, None, None
+    try:
+        if kind == "file":
+            path = r.get("path")
+            if not isinstance(path, str) or not path.startswith("/") or ".." in path.split("/"):
+                raise RuntimeError("Adj meg egy teljes, új fájlnevet.")
+            if os.path.lexists(path):
+                raise RuntimeError("Ez a fájl már létezik: a program nem ír felül meglévő fájlt.")
+            parent = os.path.dirname(path)
+            if not os.path.isdir(parent):
+                raise RuntimeError("A célmappa nem létezik.")
+            try:
+                size_mb = int(r.get("size_mb"))
+            except (TypeError, ValueError):
+                raise RuntimeError("Adj meg egy méretet megabájtban.")
+            if not 10 <= size_mb <= 4 * 1024 * 1024:
+                raise RuntimeError("A méret 10 MB és 4 TB között lehet.")
+            sv = os.statvfs(parent)
+            if size_mb * 1024 * 1024 > sv.f_bavail * sv.f_frsize - 64 * 1024 * 1024:
+                raise RuntimeError("Nincs elég szabad hely a célmappában.")
+            if hrun(["fallocate", "-l", f"{size_mb}M", path], check=False) != 0:
+                hrun(["truncate", "-s", f"{size_mb}M", path])
+            created_file = path
+            os.chmod(path, 0o600)
+            dev, loop = tc_attach(path, False)
+        elif kind == "device":
+            dev = tc_block_device_ok(r.get("path"), r.get("confirm"))
+        else:
+            raise RuntimeError("Ismeretlen célpont.")
+        args = ([tc, "--create", f"--device={dev}"] + ([f"--cipher={cipher}"] if cipher else [])
+                + ([f"--pbkdf-prf={hsh}"] if hsh else []) + [f"--keyfile={k}" for k in keyfiles]
+                + (["--insecure-erase"] if fast else []))
+        hlog("Kötet létrehozása" + ("" if fast else " (biztonságos felülírással: nagy méretnél hosszan tarthat)") + "…")
+        rc, out = tc_pty_run(args, pw, max_pw=2, yes=True)
+        if rc != 0:
+            raise RuntimeError(tc_friendly(out))
+        tmpname = "tcnew" + os.urandom(3).hex()
+        rc, out = tc_pty_run(tc_map_args(tc, tmpname, dev, keyfiles, pw), pw, max_pw=1)
+        if rc != 0:
+            raise RuntimeError("A létrehozott kötet nem nyitható meg az ellenőrzéshez: " + tc_friendly(out))
+        mapped = TC_MAPPER + tmpname
+        for _ in range(50):
+            if os.path.exists(mapped):
+                break
+            time.sleep(0.1)
+        mk_opts = list(mk_extra)
+        uid_o, gid_o = tc_user_ids()
+        if fs == "ext4" and uid_o:
+            mk_opts += ["-E", f"root_owner={uid_o}:{gid_o}"]
+        hrun([mkfs] + mk_opts + ([lab_opt, label] if label else []) + [mapped])
+    except Exception:
+        if tmpname:
+            tc_unmap(tc, tmpname)
+        tc_detach(loop)
+        loop = None
+        if created_file and os.path.exists(created_file):
+            os.remove(created_file)
+        raise
+    # Innen a kötet kész és formázott: semmilyen későbbi hiba nem törölheti.
+    subprocess.run(["sync"], capture_output=True)
+    if not tc_unmap(tc, tmpname):
+        st = tc_state_read()
+        st[tmpname] = {"source": created_file or dev, "loop": loop, "mount": None, "ro": False, "fs": fs,
+                       "created_mp": False}
+        tc_state_write(st)
+        raise RuntimeError(f"A kötet elkészült és formázva van, de a leképezése még foglalt, ezért nem sikerült lezárni. "
+                           f"A „Kötetek” fülön a Lecsatlakoztatás gombbal lezárhatod ({tmpname}). Az adat nem sérült.")
+    tc_detach(loop)
+    return "A titkosított kötet elkészült. Csatlakoztatni a „Kötetek” fülön lehet."
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
@@ -2101,7 +2567,8 @@ OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremov
        "pm_remove": op_pm_remove, "pm_cleanup": op_pm_cleanup, "pm_flatpak_setup": op_pm_flatpak_setup,
        "user_list": op_user_list, "user_add": op_user_add, "user_edit": op_user_edit,
        "user_delete": op_user_delete,
-       "self_update": op_self_update, "self_rollback": op_self_rollback}
+       "self_update": op_self_update, "self_rollback": op_self_rollback,
+       "tc_open": op_tc_open, "tc_close": op_tc_close, "tc_info": op_tc_info, "tc_create": op_tc_create}
 
 
 def helper_main():
@@ -2425,6 +2892,11 @@ XP_SVG["screensaver"] = ('<rect x="7" y="5" width="34" height="24" rx="2" fill="
                         '<rect x="20" y="29" width="8" height="5" fill="#a8a493"/>'
                         '<rect x="13" y="34" width="22" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>')
 XP_FALLBACK_ICON["screensaver"] = "preferences-desktop-screensaver"
+XP_SVG["crypto"] = ('<path d="M14 23 V16 A10 10 0 0 1 34 16 V23" fill="none" stroke="#7d7d7d" stroke-width="5"/>'
+                    '<path d="M14 23 V16 A10 10 0 0 1 34 16 V23" fill="none" stroke="#d9d9d9" stroke-width="2"/>'
+                    '<rect x="8" y="22" width="32" height="22" rx="3" fill="url(#y)" stroke="#a77c00" stroke-width="1.5"/>'
+                    '<circle cx="24" cy="31" r="3.5" fill="#6b4a00"/><rect x="22.5" y="31" width="3" height="8" fill="#6b4a00"/>')
+XP_FALLBACK_ICON["crypto"] = "dialog-password"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2596,6 +3068,8 @@ def gui_main(helper=None, run=True):
                  "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
                 ("Csomagkezelő", self.page_pkg, "pkg",
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Titkosítás", self.page_crypto, "crypto",
+                 "Titkosított kötetek (TrueCrypt-kompatibilis) létrehozása és csatlakoztatása a tcplay programmal."),
                 ("Tűzfal", self.page_firewall, "fw",
                  "Az iptables tűzfal egyszerű, grafikus kezelése (Ciszterci tűzfal)."),
                 ("Képernyővédő", self.page_screensaver, "screensaver",
@@ -2939,6 +3413,11 @@ def gui_main(helper=None, run=True):
                                       "első indításkor beépül a rendszerbe.")
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
+            if hasattr(self, "cr_store"):
+                self.cr_reload()
+                self.cr_hint.set_text("⚠ A tcplay nincs telepítve: előbb telepítsd a fenti gombbal." if not self.cr_have() else
+                                      "A tcplay TrueCrypt-kompatibilis köteteket kezel; az újabb VeraCrypt-kötetek nem "
+                                      "biztos, hogy támogatottak. A jelszót csak a művelet idejére kapja meg a program.")
             if hasattr(self, "sv_btn"):
                 t, legacy, run = sv_tool(), sv_legacy(), sv_running()
                 self.sv_btn.set_sensitive(bool(t))
@@ -3980,6 +4459,427 @@ def gui_main(helper=None, run=True):
             if legacy and self.confirm(f"Eltávolítom a(z) {', '.join(legacy)} csomagot?\n\nAz xfce4-screensaver "
                                        "marad az egyetlen képernyővédő és képernyőzár."):
                 self.run_task([("pkg", {"action": "remove", "pkgs": legacy})])
+
+        # ------------------------------------------------ Titkosítás (tcplay)
+        def page_crypto(self):
+            b = self.mk_page("Titkosítás",
+                             "TrueCrypt-kompatibilis titkosított kötetek (fájl-konténer vagy lemez) létrehozása, "
+                             "csatlakoztatása és lezárása a tcplay programmal.")
+            self.pkg_row(b, "tcplay", "A tcplay program a Debian-tárolóból.", "tcplay",
+                         [("pkg", {"action": "install", "pkgs": ["tcplay"]})],
+                         [("pkg", {"action": "remove", "pkgs": ["tcplay"]})])
+            self.cr_hint = self.lab("")
+            b.pack_start(self.cr_hint, False, False, 0)
+            nb = Gtk.Notebook()
+            nb.append_page(self.cr_tab_volumes(), Gtk.Label(label="Kötetek"))
+            nb.append_page(self.cr_tab_create(), Gtk.Label(label="Új kötet létrehozása"))
+            b.pack_start(nb, True, True, 0)
+            self.cr_keys = []
+            self.cr_reload()
+            return b
+
+        def cr_have(self):
+            return sbin_which("tcplay") is not None
+
+        # --- megnyitott kötetek
+        def cr_tab_volumes(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            self.cr_store = Gtk.ListStore(str, str, str, str)
+            self.cr_tv, sw = self.pm_list_view(self.cr_store, [
+                ("Név", 0, False, False, 0), ("Forrás", 1, False, True, 1),
+                ("Csatlakozási pont", 2, False, True, 2), ("Mód", 3, False, False, 3)])
+            self.cr_tv.get_selection().connect("changed", lambda *_: self.cr_sens())
+            v.pack_start(sw, True, True, 0)
+            bar = Gtk.Box(spacing=8)
+            self.cr_b_open = self.btn("Csatlakoztatás…", self.cr_open)
+            self.cr_b_close = self.btn("Lecsatlakoztatás", self.cr_close)
+            self.cr_b_info = self.btn("Kötetinformáció…", self.cr_info)
+            for w in (self.cr_b_open, self.cr_b_close, self.cr_b_info):
+                bar.pack_start(w, False, False, 0)
+            v.pack_start(bar, False, False, 0)
+            return v
+
+        def cr_reload(self):
+            sel = self.cr_selected()
+            self.cr_store.clear()
+            for name, e in sorted(tc_state_read().items()):
+                self.cr_store.append([name, e.get("source", "?"), e.get("mount") or "(nincs csatolva)",
+                                      "csak olvasható" if e.get("ro") else "írható"])
+            if sel:
+                for row in self.cr_store:
+                    if row[0] == sel:
+                        self.cr_tv.get_selection().select_iter(row.iter)
+            self.cr_sens()
+
+        def cr_selected(self):
+            model, it = self.cr_tv.get_selection().get_selected()
+            return model[it][0] if it else None
+
+        def cr_sens(self):
+            ok = self.cr_have()
+            self.cr_b_open.set_sensitive(ok)
+            self.cr_b_info.set_sensitive(ok)
+            self.cr_b_close.set_sensitive(ok and bool(self.cr_selected()))
+            if hasattr(self, "cr_b_create"):
+                self.cr_b_create.set_sensitive(ok)
+
+        # --- közös: forrás- és kulcsfájl-választás
+        def cr_devices(self):
+            """Nem csatolt lemezek és partíciók (lsblk), (útvonal, leírás) párokban."""
+            try:
+                p = subprocess.run(["lsblk", "-J", "-p", "-o", "NAME,SIZE,TYPE,MODEL,FSTYPE,LABEL,MOUNTPOINTS"],
+                                   capture_output=True, text=True, timeout=10)
+                data = json.loads(p.stdout)
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                return []
+            out = []
+
+            def mounted(n):
+                if any(m for m in (n.get("mountpoints") or []) if m):
+                    return True
+                return any(mounted(c) for c in n.get("children") or [])
+
+            def walk(n):
+                if n.get("type") in ("disk", "part") and n.get("size") not in (None, "0B") and not mounted(n):
+                    desc = " · ".join(x for x in (n.get("size"), n.get("model"), n.get("fstype"), n.get("label")) if x)
+                    out.append((n["name"], f"{n['name']}  ({desc})"))
+                for c in n.get("children") or []:
+                    walk(c)
+            for n in data.get("blockdevices", []):
+                walk(n)
+            return out
+
+        def cr_pick_file(self, title, multiple=False, save=False):
+            act = Gtk.FileChooserAction.SAVE if save else Gtk.FileChooserAction.OPEN
+            d = Gtk.FileChooserDialog(title=title, transient_for=self, action=act)
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Kiválasztás", Gtk.ResponseType.OK)
+            d.set_select_multiple(multiple)
+            if save:
+                d.set_do_overwrite_confirmation(True)
+            res = None
+            if d.run() == Gtk.ResponseType.OK:
+                res = d.get_filenames() if multiple else d.get_filename()
+            d.destroy()
+            return res
+
+        def cr_volume_dialog(self, title, ok_label, full):
+            """Közös ablak a csatlakoztatáshoz (full=True) és az információhoz. Visszatér: paraméterek vagy None."""
+            d, area = self.xp_dialog(title, "crypto",
+                                     "Add meg a kötet helyét és a jelszót (vagy kulcsfájlt).", ok_label)
+            d.set_default_size(560, -1)
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            g.set_border_width(16)
+            area.pack_start(g, True, True, 0)
+            keys = []
+            rb_file = Gtk.RadioButton.new_with_label_from_widget(None, "Fájl-konténer")
+            rb_dev = Gtk.RadioButton.new_with_label_from_widget(rb_file, "Lemez / partíció")
+            kind = Gtk.Box(spacing=14)
+            kind.pack_start(rb_file, False, False, 0)
+            kind.pack_start(rb_dev, False, False, 0)
+            g.attach(Gtk.Label(label="Forrás:", xalign=1), 0, 0, 1, 1)
+            g.attach(kind, 1, 0, 1, 1)
+            e_path = Gtk.Entry()
+            e_path.set_placeholder_text("/elérési/út/konténer.tc")
+            b_browse = self.btn("Tallózás…", lambda *_: e_path.set_text(self.cr_pick_file("Konténerfájl") or e_path.get_text()))
+            frow = Gtk.Box(spacing=6)
+            frow.pack_start(e_path, True, True, 0)
+            frow.pack_start(b_browse, False, False, 0)
+            devs = self.cr_devices()
+            cb_dev = Gtk.ComboBoxText()
+            for _p, desc in devs:
+                cb_dev.append_text(desc)
+            if devs:
+                cb_dev.set_active(0)
+            g.attach(frow, 1, 1, 1, 1)
+            g.attach(cb_dev, 1, 2, 1, 1)
+
+            def swap(*_):
+                frow.set_visible(rb_file.get_active())
+                cb_dev.set_visible(rb_dev.get_active())
+            rb_file.connect("toggled", swap)
+            rb_dev.connect("toggled", swap)
+            e_pw = Gtk.Entry()
+            e_pw.set_visibility(False)
+            e_pw.set_activates_default(True)
+            g.attach(Gtk.Label(label="Jelszó:", xalign=1), 0, 3, 1, 1)
+            e_pw.set_hexpand(True)
+            g.attach(e_pw, 1, 3, 1, 1)
+            klbl = Gtk.Label(label="nincs", xalign=0)
+
+            def add_keys(*_):
+                got = self.cr_pick_file("Kulcsfájlok", multiple=True)
+                if got:
+                    keys.extend(k for k in got if k not in keys)
+                    klbl.set_text(", ".join(os.path.basename(k) for k in keys))
+
+            def clr_keys(*_):
+                keys.clear()
+                klbl.set_text("nincs")
+            krow = Gtk.Box(spacing=6)
+            krow.pack_start(klbl, True, True, 0)
+            krow.pack_start(self.btn("Hozzáadás…", add_keys), False, False, 0)
+            krow.pack_start(self.btn("Törlés", clr_keys), False, False, 0)
+            g.attach(Gtk.Label(label="Kulcsfájlok:", xalign=1), 0, 4, 1, 1)
+            g.attach(krow, 1, 4, 1, 1)
+            e_name = e_mp = None
+            chk_ro = Gtk.CheckButton(label="Csak olvasható csatlakoztatás")
+            chk_own = Gtk.CheckButton(label="A kötet gyökérmappája legyen az enyém (sudo nélkül is írható, ext4 stb.)")
+            chk_own.set_active(True)
+            if full:
+                e_name = Gtk.Entry()
+                e_name.set_placeholder_text("pl. adatok (betű, szám, _ és -)")
+                e_mp = Gtk.Entry()
+                e_mp.set_placeholder_text("üresen hagyva: /media/<felhasználó>/<név>")
+                g.attach(Gtk.Label(label="Név:", xalign=1), 0, 5, 1, 1)
+                g.attach(e_name, 1, 5, 1, 1)
+                g.attach(Gtk.Label(label="Csatlakozási pont:", xalign=1), 0, 6, 1, 1)
+                g.attach(e_mp, 1, 6, 1, 1)
+                g.attach(chk_ro, 1, 7, 1, 1)
+                g.attach(chk_own, 1, 8, 1, 1)
+            err = Gtk.Label(xalign=0)
+            err.set_line_wrap(True)
+            err.set_margin_start(16)
+            err.set_margin_end(16)
+            area.pack_start(err, False, False, 4)
+            d.show_all()
+            swap()
+            while True:
+                if d.run() != Gtk.ResponseType.OK:
+                    d.destroy()
+                    return None
+                path = e_path.get_text().strip() if rb_file.get_active() else \
+                    (devs[cb_dev.get_active()][0] if devs and cb_dev.get_active() >= 0 else "")
+                name = (e_name.get_text().strip() if e_name else "")
+                msg = ""
+                if not path:
+                    msg = "Add meg a kötet helyét."
+                elif not e_pw.get_text() and not keys:
+                    msg = "Jelszó vagy kulcsfájl megadása kötelező."
+                elif full and not name and rb_file.get_active():
+                    name = re.sub(r"[^A-Za-z0-9_-]", "_", os.path.splitext(os.path.basename(path))[0])[:32] or "kotet"
+                elif full and not name:
+                    name = re.sub(r"[^A-Za-z0-9_-]", "_", os.path.basename(path))[:32] or "kotet"
+                if full and not msg and not re.match(r"^[A-Za-z0-9_-]{1,32}$", name):
+                    msg = "A név csak betűt, számot, _ és - jelet tartalmazhat (legfeljebb 32 karakter)."
+                if msg:
+                    err.set_markup(f'<span foreground="#b91c1c">⚠ {msg}</span>')
+                    continue
+                break
+            res = {"path": path, "passphrase": e_pw.get_text(), "keyfiles": list(keys)}
+            if full:
+                res.update({"name": name, "mountpoint": e_mp.get_text().strip(), "readonly": chk_ro.get_active(),
+                            "take_owner": chk_own.get_active()})
+            d.destroy()
+            return res
+
+        def cr_open(self, *_):
+            p = self.cr_volume_dialog("Titkosított kötet csatlakoztatása", "Csatlakoztatás", True)
+            if p:
+                self.run_task([("tc_open", p)], lambda *_: self.cr_reload())
+
+        def cr_close(self, *_):
+            n = self.cr_selected()
+            if n and self.confirm(f"Lecsatlakoztatod és lezárod a(z) {n} kötetet?\n\n"
+                                  "Előtte zárd be a kötet fájljait és mappáit."):
+                self.run_task([("tc_close", {"name": n})], lambda *_: self.cr_reload())
+
+        def cr_info(self, *_):
+            p = self.cr_volume_dialog("Kötetinformáció", "Lekérdezés", False)
+            if not p:
+                return
+
+            def done(rc, msg, data):
+                if rc == 0 and isinstance(data, dict):
+                    d, area = self.xp_dialog("Kötetinformáció", "crypto", "", "OK")
+                    l = Gtk.Label(label=data.get("info") or "(nincs adat)", xalign=0)
+                    l.set_selectable(True)
+                    for m in ("top", "bottom", "start", "end"):
+                        getattr(l, f"set_margin_{m}")(18)
+                    area.pack_start(l, True, True, 0)
+                    d.show_all()
+                    d.run()
+                    d.destroy()
+            self.run_task([("tc_info", p)], done)
+
+        # --- új kötet
+        def cr_tab_create(self):
+            v = Gtk.Box(orientation=V, spacing=8)
+            v.set_border_width(10)
+            self.cr_keys = []
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            v.pack_start(g, False, False, 0)
+
+            def row(r, text, w):
+                g.attach(Gtk.Label(label=text, xalign=1), 0, r, 1, 1)
+                w.set_hexpand(True)
+                g.attach(w, 1, r, 1, 1)
+            self.cr_rb_file = Gtk.RadioButton.new_with_label_from_widget(None, "Új fájl-konténer")
+            self.cr_rb_dev = Gtk.RadioButton.new_with_label_from_widget(self.cr_rb_file, "Lemez / partíció (a tartalma TÖRLŐDIK)")
+            kind = Gtk.Box(orientation=V, spacing=2)
+            kind.pack_start(self.cr_rb_file, False, False, 0)
+            kind.pack_start(self.cr_rb_dev, False, False, 0)
+            row(0, "Cél:", kind)
+            self.cr_e_path = Gtk.Entry()
+            self.cr_e_path.set_placeholder_text("/elérési/út/uj-konténer.tc")
+            b_br = self.btn("Tallózás…", lambda *_: self.cr_e_path.set_text(
+                self.cr_pick_file("Az új konténer helye", save=True) or self.cr_e_path.get_text()))
+            frow = Gtk.Box(spacing=6)
+            frow.pack_start(self.cr_e_path, True, True, 0)
+            frow.pack_start(b_br, False, False, 0)
+            self.cr_frow = frow
+            row(1, "Fájl:", frow)
+            self.cr_e_size = Gtk.Entry()
+            self.cr_e_size.set_placeholder_text("méret megabájtban, pl. 1024")
+            self.cr_size_row = self.cr_e_size
+            row(2, "Méret (MB):", self.cr_e_size)
+            self.cr_cb_dev = Gtk.ComboBoxText()
+            self.cr_devs = []
+            b_ref = self.btn("Lista frissítése", lambda *_: self.cr_fill_devs())
+            drow = Gtk.Box(spacing=6)
+            drow.pack_start(self.cr_cb_dev, True, True, 0)
+            drow.pack_start(b_ref, False, False, 0)
+            self.cr_drow = drow
+            row(3, "Eszköz:", drow)
+            self.cr_pw1, self.cr_pw2 = Gtk.Entry(), Gtk.Entry()
+            for e in (self.cr_pw1, self.cr_pw2):
+                e.set_visibility(False)
+            self.cr_pw1.set_placeholder_text("legalább 8 karakter (hosszú jelszó ajánlott)")
+            row(4, "Jelszó:", self.cr_pw1)
+            row(5, "Jelszó még egyszer:", self.cr_pw2)
+            self.cr_klbl = Gtk.Label(label="nincs", xalign=0)
+
+            def add_keys(*_):
+                got = self.cr_pick_file("Kulcsfájlok", multiple=True)
+                if got:
+                    self.cr_keys.extend(k for k in got if k not in self.cr_keys)
+                    self.cr_klbl.set_text(", ".join(os.path.basename(k) for k in self.cr_keys))
+
+            def clr_keys(*_):
+                self.cr_keys.clear()
+                self.cr_klbl.set_text("nincs")
+            krow = Gtk.Box(spacing=6)
+            krow.pack_start(self.cr_klbl, True, True, 0)
+            krow.pack_start(self.btn("Hozzáadás…", add_keys), False, False, 0)
+            krow.pack_start(self.btn("Törlés", clr_keys), False, False, 0)
+            row(6, "Kulcsfájlok (nem kötelező):", krow)
+            self.cr_cb_cipher = Gtk.ComboBoxText()
+            for t in ("Alapértelmezett (AES-256-XTS)", "TWOFISH-256-XTS", "SERPENT-256-XTS",
+                      "AES-256-XTS,TWOFISH-256-XTS (kaszkád)", "AES-256-XTS,TWOFISH-256-XTS,SERPENT-256-XTS (kaszkád)"):
+                self.cr_cb_cipher.append_text(t)
+            self.cr_cb_cipher.set_active(0)
+            row(7, "Titkosító:", self.cr_cb_cipher)
+            self.cr_cb_hash = Gtk.ComboBoxText()
+            for t in ("Alapértelmezett (RIPEMD160)", "SHA512", "whirlpool"):
+                self.cr_cb_hash.append_text(t)
+            self.cr_cb_hash.set_active(0)
+            row(8, "Kulcsképzés (PBKDF2):", self.cr_cb_hash)
+            self.cr_cb_fs = Gtk.ComboBoxText()
+            self.cr_fs_keys = []
+            for key, label in (("ext4", "ext4 (Linux)"), ("exfat", "exFAT (Linux, Windows, macOS)"),
+                               ("vfat", "FAT32 (régi eszközök, max. 4 GB-os fájlok)"), ("ntfs", "NTFS (Windows)")):
+                if sbin_which(TC_FS[key][0]):
+                    self.cr_cb_fs.append_text(label)
+                    self.cr_fs_keys.append(key)
+            if self.cr_fs_keys:
+                self.cr_cb_fs.set_active(0)
+            row(9, "Fájlrendszer:", self.cr_cb_fs)
+            self.cr_e_label = Gtk.Entry()
+            self.cr_e_label.set_placeholder_text("a kötet címkéje (nem kötelező)")
+            row(10, "Címke:", self.cr_e_label)
+            self.cr_chk_fast = Gtk.CheckButton(label="Gyors létrehozás: a biztonságos felülírás kihagyása (nem ajánlott)")
+            g.attach(self.cr_chk_fast, 1, 11, 1, 1)
+            v.pack_start(self.lab("A létrehozás alapból véletlen adatokkal írja felül a teljes célt, ami nagy méretnél "
+                                  "(főleg lemezen) hosszú ideig tarthat. A jelszó nélkül az adatok nem állíthatók vissza, "
+                                  "ezért jegyezd meg jól, vagy mentsd el biztonságos helyre."), False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.cr_b_create = self.btn("Létrehozás…", self.cr_create)
+            bar.pack_start(self.cr_b_create, False, False, 0)
+            v.pack_start(bar, False, False, 0)
+            self.cr_rb_file.connect("toggled", self.cr_kind_changed)
+            self.cr_rb_dev.connect("toggled", self.cr_kind_changed)
+            self.cr_fill_devs()
+            self.cr_kind_changed()
+            return v
+
+        def cr_fill_devs(self):
+            self.cr_cb_dev.remove_all()
+            self.cr_devs = self.cr_devices()
+            for _p, desc in self.cr_devs:
+                self.cr_cb_dev.append_text(desc)
+            if self.cr_devs:
+                self.cr_cb_dev.set_active(0)
+
+        def cr_kind_changed(self, *_):
+            f = self.cr_rb_file.get_active()
+            for w in (self.cr_frow, self.cr_size_row):
+                w.set_sensitive(f)
+            self.cr_drow.set_sensitive(not f)
+
+        def cr_create(self, *_):
+            f = self.cr_rb_file.get_active()
+            p1, p2 = self.cr_pw1.get_text(), self.cr_pw2.get_text()
+            path = self.cr_e_path.get_text().strip() if f else \
+                (self.cr_devs[self.cr_cb_dev.get_active()][0] if self.cr_devs and self.cr_cb_dev.get_active() >= 0 else "")
+            msg = ""
+            if not path:
+                msg = "Add meg a célt."
+            elif f and not self.cr_e_size.get_text().strip().isdigit():
+                msg = "Add meg a méretet megabájtban."
+            elif p1 != p2:
+                msg = "A két jelszó nem egyezik."
+            elif len(p1) < 8:
+                msg = "A jelszó legalább 8 karakter legyen."
+            elif not self.cr_fs_keys:
+                msg = "Nincs elérhető formázóprogram a fájlrendszerekhez."
+            if msg:
+                self.say(1, msg)
+                return
+            ci = self.cr_cb_cipher.get_active_text() or ""
+            ha = self.cr_cb_hash.get_active_text() or ""
+            params = {"kind": "file" if f else "device", "path": path, "passphrase": p1, "keyfiles": list(self.cr_keys),
+                      "cipher": "" if ci.startswith("Alap") else ci.split(" ")[0],
+                      "hash": "" if ha.startswith("Alap") else ha,
+                      "fs": self.cr_fs_keys[self.cr_cb_fs.get_active()], "label": self.cr_e_label.get_text().strip(),
+                      "fast": self.cr_chk_fast.get_active()}
+            if f:
+                params["size_mb"] = int(self.cr_e_size.get_text().strip())
+                if not self.confirm(f"Új titkosított konténer létrehozása\n\nFájl: {path}\nMéret: {params['size_mb']} MB\n"
+                                    f"Fájlrendszer: {params['fs']}\n\nA jelszó nélkül az adatok nem állíthatók vissza."):
+                    return
+            else:
+                typed = self.cr_confirm_device(path)
+                if not typed:
+                    return
+                params["confirm"] = typed
+            self.cr_pw1.set_text("")
+            self.cr_pw2.set_text("")
+            self.run_task([("tc_create", params)], lambda *_: self.cr_reload())
+
+        def cr_confirm_device(self, path):
+            d, area = self.xp_dialog("Lemez törlésének megerősítése", "crypto", "", "Törlés és létrehozás")
+            box = Gtk.Box(orientation=V, spacing=10)
+            box.set_border_width(18)
+            l = Gtk.Label(xalign=0)
+            l.set_line_wrap(True)
+            l.set_max_width_chars(56)
+            l.set_markup(f"<b>FIGYELEM!</b> A(z) <b>{GLib.markup_escape_text(path)}</b> teljes tartalma "
+                         "véglegesen és visszavonhatatlanul <b>törlődik</b>.\n\nA megerősítéshez írd be az eszköz "
+                         "pontos nevét:")
+            e = Gtk.Entry()
+            e.set_placeholder_text(path)
+            box.pack_start(l, False, False, 0)
+            box.pack_start(e, False, False, 0)
+            area.pack_start(box, True, True, 0)
+            d.show_all()
+            ok = d.run() == Gtk.ResponseType.OK
+            typed = e.get_text().strip()
+            d.destroy()
+            if ok and typed == path:
+                return typed
+            if ok:
+                self.say(1, "A beírt név nem egyezik az eszköz nevével: a művelet megszakítva.")
+            return None
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
