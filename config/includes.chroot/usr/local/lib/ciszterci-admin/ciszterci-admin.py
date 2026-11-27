@@ -5860,7 +5860,7 @@ def gui_main(helper=None, run=True):
             ebox.set_border_width(8)
             ebox.pack_start(self.lab("Alapból az rclone közös azonosítóját használja a program, ami kisebb használatnál "
                                      "megfelel. Sokan egyszerre, vagy nagy forgalom esetén érdemes saját azonosítót "
-                                     "létrehozni a Google Cloud Console-ban (Drive API, asztali alkalmazás), és ide beírni."),
+                                     "létrehozni a Google Cloud Console-ban (Drive API; https://console.cloud.google.com/apis/credentials), és ide beírni."),
                             False, False, 0)
             self.gd_cid, self.gd_csec = Gtk.Entry(), Gtk.Entry()
             self.gd_cid.set_placeholder_text("Client ID")
