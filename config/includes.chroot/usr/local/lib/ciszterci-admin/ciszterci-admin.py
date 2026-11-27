@@ -467,7 +467,8 @@ def op_login(r):
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
                  "xfce4-settings", "veyon-service", "veyon-configurator",
-                 "xfce4-screensaver", "light-locker", "light-locker-settings", "tcplay", "age"}
+                 "xfce4-screensaver", "light-locker", "light-locker-settings", "tcplay", "age",
+                 "rclone", "fuse3", "xdg-utils"}
 
 
 def op_pkg(r):
@@ -2738,6 +2739,253 @@ def age_pubkey(identity):
     return p.stdout.strip()
 
 
+# ------------------------------------------------------------ Google Drive (rclone + FUSE)
+GD_REMOTE = "googledrive"
+GD_UNIT = "rclone-googledrive.service"
+GD_PKGS = ["rclone", "fuse3", "xdg-utils"]
+GD_PATH_RE = re.compile(r"^/[A-Za-z0-9._/-]+$")
+
+
+def gd_check_mount(mp):
+    if not isinstance(mp, str) or not GD_PATH_RE.match(mp) or ".." in mp.split("/"):
+        raise RuntimeError("A csatlakozási pont útvonalában csak betű, szám, . _ - és / lehet.")
+    mp = os.path.normpath(mp)
+    if not mp.startswith(TC_MOUNT_ROOTS):
+        raise RuntimeError("A csatlakozási pont a /media, /mnt vagy /home alatt lehet.")
+    return mp
+
+
+def op_gd_prepare(r):
+    """A csatlakozási mappa létrehozása a felhasználó tulajdonában (a /media/<felhasználó> root-é, ezért kell hozzá jog)."""
+    mp = gd_check_mount(r.get("mountpoint"))
+    u = invoking_user()
+    try:
+        ent = pwd.getpwnam(u) if u else None
+    except KeyError:
+        ent = None
+    if not ent:
+        raise RuntimeError("A felhasználó nem állapítható meg.")
+    try:
+        os.stat(mp)
+    except OSError as e:
+        if e.errno == 107:                           # megmaradt, leválasztatlan FUSE-csatolás
+            hrun(["umount", "-l", mp], check=False)
+    if os.path.ismount(mp):
+        return "A csatlakozási pont már csatolva van."
+    if os.path.exists(mp) and not os.path.isdir(mp):
+        raise RuntimeError("A csatlakozási pont egy fájl, nem mappa.")
+    if os.path.isdir(mp) and os.listdir(mp):
+        raise RuntimeError("A csatlakozási mappa nem üres.")
+    os.makedirs(mp, mode=0o755, exist_ok=True)
+    os.chown(mp, ent.pw_uid, ent.pw_gid)
+    os.chmod(mp, 0o755)
+    return f"A csatlakozási mappa előkészítve: {mp}"
+
+
+# -- a felhasználó saját jogaival futó részek
+def gd_have():
+    return bool(shutil.which("rclone") and (shutil.which("fusermount3") or shutil.which("fusermount")))
+
+
+def gd_run(args, timeout=30):
+    try:
+        p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return 127, ""
+    return p.returncode, p.stdout + p.stderr
+
+
+def gd_remote_ready():
+    """Van-e bejelentkezett (tokennel rendelkező) Google Drive-távoli."""
+    exe = shutil.which("rclone")
+    if not exe:
+        return False
+    rc, out = gd_run([exe, "config", "dump"])
+    try:
+        d = json.loads(out)
+    except ValueError:
+        return False
+    r = d.get(GD_REMOTE) if isinstance(d, dict) else None
+    return bool(r and r.get("type") == "drive" and r.get("token"))
+
+
+def gd_login(holder, client_id="", client_secret="", timeout=300):
+    """Google-bejelentkezés: az rclone megnyitja a böngészőt, és megvárja a visszatérést.
+    A holder-be kerül: proc (a folyamat), url (a böngészős hivatkozás), on_url (értesítő függvény), cancel."""
+    exe = shutil.which("rclone")
+    if not exe:
+        raise RuntimeError("Az rclone nincs telepítve.")
+    gd_run([exe, "config", "delete", GD_REMOTE])                 # tiszta lappal indulunk
+    args = [exe, "config", "create", GD_REMOTE, "drive", "scope=drive"]
+    if client_id and client_secret:
+        args += [f"client_id={client_id}", f"client_secret={client_secret}"]
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL)
+    holder["proc"] = p
+    lines = []
+
+    def reader():
+        for line in p.stdout:
+            lines.append(line.rstrip())
+            m = re.search(r"https?://127\.0\.0\.1:\d+/auth\S*", line)
+            if m:
+                holder["url"] = m.group(0)
+                if holder.get("on_url"):
+                    holder["on_url"](m.group(0))
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    try:
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        p.wait()
+        t.join(3)
+        gd_run([exe, "config", "delete", GD_REMOTE])
+        raise RuntimeError("A bejelentkezés túllépte az időkorlátot (5 perc). Próbáld újra.")
+    t.join(5)
+    if holder.get("cancel"):
+        gd_run([exe, "config", "delete", GD_REMOTE])
+        raise RuntimeError("A bejelentkezést megszakítottad.")
+    if p.returncode != 0 or not gd_remote_ready():
+        gd_run([exe, "config", "delete", GD_REMOTE])
+        tail = [x for x in lines if x.strip()]
+        raise RuntimeError("A bejelentkezés nem sikerült: " + (" | ".join(tail[-2:])[:200] or "ismeretlen hiba"))
+    return True
+
+
+def gd_userinfo():
+    exe = shutil.which("rclone")
+    rc, out = gd_run([exe, "config", "userinfo", f"{GD_REMOTE}:"], timeout=30) if exe else (1, "")
+    info = {}
+    for line in out.splitlines():
+        k, _, v = line.partition(":")
+        if v.strip():
+            info[k.strip().lower()] = v.strip()
+    name, mail = info.get("name", ""), info.get("email", "")
+    return f"{name} ({mail})" if name and mail else (mail or name)
+
+
+def gd_about():
+    exe = shutil.which("rclone")
+    rc, out = gd_run([exe, "about", f"{GD_REMOTE}:"], timeout=40) if exe else (1, "")
+    vals = {}
+    for line in out.splitlines():
+        k, _, v = line.partition(":")
+        if v.strip():
+            vals[k.strip().lower()] = v.strip()
+    if "total" in vals and "used" in vals:
+        return f"Tárhely: {vals['used']} használt / {vals['total']} összesen"
+    return ""
+
+
+def gd_unit_path():
+    return os.path.join(os.path.expanduser("~"), ".config", "systemd", "user", GD_UNIT)
+
+
+def gd_systemd_user():
+    rc, _ = gd_run(["systemctl", "--user", "show-environment"], timeout=10)
+    return rc == 0
+
+
+def gd_mounted(mp):
+    try:
+        return os.path.ismount(mp)
+    except OSError:
+        return False
+
+
+def gd_state(mp):
+    st = {"mounted": gd_mounted(mp), "active": False, "enabled": False}
+    if shutil.which("systemctl"):
+        st["active"] = gd_run(["systemctl", "--user", "is-active", GD_UNIT], 10)[0] == 0
+        st["enabled"] = gd_run(["systemctl", "--user", "is-enabled", GD_UNIT], 10)[0] == 0
+    return st
+
+
+def gd_mount_args(mp):
+    return ["mount", f"{GD_REMOTE}:", mp, "--vfs-cache-mode", "full", "--vfs-cache-max-size", "2G",
+            "--vfs-cache-max-age", "24h", "--dir-cache-time", "5m", "--poll-interval", "30s"]
+
+
+def gd_write_unit(mp):
+    exe = shutil.which("rclone")
+    fm = shutil.which("fusermount3") or shutil.which("fusermount")
+    if not exe or not fm:
+        raise RuntimeError("Az rclone vagy a fuse3 nincs telepítve.")
+    text = ("[Unit]\nDescription=Google Drive csatlakoztatása (rclone)\nAfter=network-online.target\n"
+            "Wants=network-online.target\n\n[Service]\nType=notify\n"
+            f"ExecStart={exe} {' '.join(gd_mount_args(mp))}\n"
+            f"ExecStop={fm} -u {mp}\nRestart=on-failure\nRestartSec=15\nTimeoutStartSec=90\n\n"
+            "[Install]\nWantedBy=default.target\n")
+    path = gd_unit_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
+def gd_start(mp, autostart=True):
+    """A Google Drive csatlakoztatása a felhasználó saját folyamataként (systemd --user, vagy tartalék: háttérfolyamat)."""
+    mp = gd_check_mount(mp)
+    if gd_mounted(mp):
+        return f"A Google Drive már csatlakoztatva van: {mp}"
+    if not os.path.isdir(mp) or not os.access(mp, os.W_OK):
+        raise RuntimeError("A csatlakozási mappa nem létezik vagy nem a te tulajdonodban van.")
+    if gd_systemd_user() and shutil.which("systemctl"):
+        gd_write_unit(mp)
+        gd_run(["systemctl", "--user", "daemon-reload"], 20)
+        gd_run(["systemctl", "--user", "enable" if autostart else "disable", GD_UNIT], 20)
+        rc, out = gd_run(["systemctl", "--user", "restart", GD_UNIT], 120)
+        for _ in range(40):
+            if gd_mounted(mp):
+                break
+            time.sleep(0.5)
+        if not gd_mounted(mp):
+            _, log = gd_run(["journalctl", "--user", "-u", GD_UNIT, "-n", "5", "--no-pager", "-o", "cat"], 10)
+            raise RuntimeError("A csatlakoztatás nem sikerült: " + (log.strip().splitlines()[-1][:200] if log.strip() else out.strip()[:200]))
+    else:
+        p = subprocess.run([shutil.which("rclone")] + gd_mount_args(mp) + ["--daemon"], capture_output=True, text=True)
+        for _ in range(40):
+            if gd_mounted(mp):
+                break
+            time.sleep(0.5)
+        if not gd_mounted(mp):
+            raise RuntimeError("A csatlakoztatás nem sikerült: " + (p.stderr.strip()[-200:] or "ismeretlen hiba"))
+    return f"A Google Drive csatlakoztatva: {mp}"
+
+
+def gd_stop(mp):
+    mp = gd_check_mount(mp)
+    if shutil.which("systemctl") and os.path.exists(gd_unit_path()):
+        gd_run(["systemctl", "--user", "stop", GD_UNIT], 60)
+    if gd_mounted(mp):
+        fm = shutil.which("fusermount3") or shutil.which("fusermount")
+        if fm:
+            gd_run([fm, "-u", mp], 30)
+    for _ in range(20):
+        if not gd_mounted(mp):
+            return "A Google Drive lecsatlakoztatva."
+        time.sleep(0.5)
+    raise RuntimeError("A mappa használatban van (nyitott fájl vagy mappa): zárd be, majd próbáld újra.")
+
+
+def gd_logout(mp):
+    exe = shutil.which("rclone")
+    try:
+        gd_stop(mp)
+    except RuntimeError:
+        raise RuntimeError("Előbb zárd be a Google Drive mappában nyitva lévő fájlokat, hogy le lehessen csatlakoztatni.")
+    if shutil.which("systemctl"):
+        gd_run(["systemctl", "--user", "disable", GD_UNIT], 20)
+    try:
+        os.remove(gd_unit_path())
+    except OSError:
+        pass
+    if exe:
+        gd_run([exe, "config", "disconnect", f"{GD_REMOTE}:"], 30)
+        gd_run([exe, "config", "delete", GD_REMOTE], 30)
+    return "Kijelentkeztél: a Google-fiók hozzáférési kulcsa törölve lett erről a gépről."
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
@@ -2751,7 +2999,8 @@ OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremov
        "user_list": op_user_list, "user_add": op_user_add, "user_edit": op_user_edit,
        "user_delete": op_user_delete,
        "self_update": op_self_update, "self_rollback": op_self_rollback,
-       "tc_open": op_tc_open, "tc_close": op_tc_close, "tc_info": op_tc_info, "tc_create": op_tc_create}
+       "tc_open": op_tc_open, "tc_close": op_tc_close, "tc_info": op_tc_info, "tc_create": op_tc_create,
+       "gd_prepare": op_gd_prepare}
 
 
 def helper_main():
@@ -3238,7 +3487,7 @@ def gui_main(helper=None, run=True):
                 ("Távoli segítség", self.page_remote, "remote",
                  "Programok, amelyekkel egy rendszergazda távolról segíthet."),
                 ("Felhő tárhely", self.page_cloud, "cloud",
-                 "Felhő tárhely kliens (Nextcloud) telepítése és eltávolítása."),
+                 "Google Drive csatlakoztatása mappaként (bejelentkezéssel), és a Nextcloud kliens."),
                 ("Tartományba léptetés", self.page_domain, "domain",
                  "A gép felvétele a tartományba (Active Directory), illetve kivétele onnan."),
                 ("WireGuard VPN", self.page_wg, "vpn",
@@ -3274,6 +3523,7 @@ def gui_main(helper=None, run=True):
             self.sh_idx = [p[0] for p in pages].index("Mappamegosztás")
             self.pm_idx = [p[0] for p in pages].index("Csomagkezelő")
             self.us_idx = [p[0] for p in pages].index("Felhasználók")
+            self.cloud_idx = [p[0] for p in pages].index("Felhő tárhely")
             self.pm_loaded, self.pm_seq = False, 0
             self.nav_hist, self.nav_pos = [-1], 0
 
@@ -3392,6 +3642,8 @@ def gui_main(helper=None, run=True):
                     self.pm_on_show()
                 if idx == self.us_idx and not self.us_loaded:
                     self.us_on_show()
+                if idx == self.cloud_idx:
+                    self.gd_refresh(info=True)
             self.b_back.set_sensitive(self.nav_pos > 0)
             self.b_fwd.set_sensitive(self.nav_pos < len(self.nav_hist) - 1)
             self.b_up.set_sensitive(idx >= 0)
@@ -3596,6 +3848,8 @@ def gui_main(helper=None, run=True):
                                       "első indításkor beépül a rendszerbe.")
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
+            if hasattr(self, "gd_b_connect"):
+                self.gd_refresh()
             if hasattr(self, "cr_store"):
                 self.cr_reload()
                 self.ag_sens()
@@ -5568,11 +5822,249 @@ def gui_main(helper=None, run=True):
 
         # ------------------------------------------------------ Felhő tárhely
         def page_cloud(self):
-            b = self.mk_page("Felhő tárhely")
+            b = self.mk_page("Felhő tárhely",
+                             "Felhőtárhelyek használata: a Google Drive mappaként csatlakoztatható a gépre, a Nextcloudhoz "
+                             "kliensprogram telepíthető.")
+            self.gd_section(b)
+            self.head(b, "Nextcloud")
             self.pkg_row(b, "Nextcloud kliens", "A nextcloud-desktop csomag (Debian-tárolóból).",
                          "nextcloud-desktop", [("pkg", {"action": "install", "pkgs": ["nextcloud-desktop"]})],
                          [("pkg", {"action": "remove", "pkgs": ["nextcloud-desktop"]})])
             return b
+
+        def gd_section(self, b):
+            self.head(b, "Google Drive")
+            b.pack_start(self.lab("Elég bejelentkezned a Google-fiókodba: a program telepíti a szükséges programokat, "
+                                  "és a Google Drive-ot egy mappaként csatlakoztatja a gépre, így a fájlokat a "
+                                  "fájlkezelőből ugyanúgy használhatod, mint a saját mappáidat."), False, False, 0)
+            try:
+                user = pwd.getpwuid(os.getuid()).pw_name
+            except KeyError:
+                user = "felhasznalo"
+            self.gd_default = f"/media/{user}/GoogleDrive"
+            self.gd_acct = self.lab("")
+            self.gd_stat = self.lab("")
+            b.pack_start(self.gd_acct, False, False, 0)
+            b.pack_start(self.gd_stat, False, False, 0)
+            row = Gtk.Box(spacing=8)
+            row.pack_start(Gtk.Label(label="Csatlakozási pont:"), False, False, 0)
+            self.gd_mp = Gtk.Entry()
+            self.gd_mp.set_text(self.gd_default)
+            row.pack_start(self.gd_mp, True, True, 0)
+            b.pack_start(row, False, False, 0)
+            self.gd_chk_auto = Gtk.CheckButton(label="Automatikus csatlakoztatás minden bejelentkezéskor")
+            self.gd_chk_auto.set_active(True)
+            b.pack_start(self.gd_chk_auto, False, False, 0)
+            exp = Gtk.Expander(label="Haladó: saját Google API-azonosító (nem kötelező)")
+            ebox = Gtk.Box(orientation=V, spacing=6)
+            ebox.set_border_width(8)
+            ebox.pack_start(self.lab("Alapból az rclone közös azonosítóját használja a program, ami kisebb használatnál "
+                                     "megfelel. Sokan egyszerre, vagy nagy forgalom esetén érdemes saját azonosítót "
+                                     "létrehozni a Google Cloud Console-ban (Drive API, asztali alkalmazás), és ide beírni."),
+                            False, False, 0)
+            self.gd_cid, self.gd_csec = Gtk.Entry(), Gtk.Entry()
+            self.gd_cid.set_placeholder_text("Client ID")
+            self.gd_csec.set_placeholder_text("Client Secret")
+            self.gd_csec.set_visibility(False)
+            ebox.pack_start(self.gd_cid, False, False, 0)
+            ebox.pack_start(self.gd_csec, False, False, 0)
+            exp.add(ebox)
+            b.pack_start(exp, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.gd_b_connect = self.btn("Bejelentkezés Google-fiókkal és csatlakoztatás", self.gd_connect)
+            self.gd_b_open = self.btn("Mappa megnyitása", self.gd_open)
+            self.gd_b_disc = self.btn("Lecsatlakoztatás", self.gd_disconnect)
+            self.gd_b_out = self.btn("Kijelentkezés…", self.gd_signout)
+            for w in (self.gd_b_connect, self.gd_b_open, self.gd_b_disc, self.gd_b_out):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.pkg_row(b, "Google Drive-kezelő programok", "Az rclone és a fuse3 csomag (Debian-tárolóból).",
+                         "rclone", [("pkg", {"action": "install", "pkgs": GD_PKGS})],
+                         [("pkg", {"action": "remove", "pkgs": ["rclone"]})])
+            self.gd_apply(False, {"mounted": False, "active": False, "enabled": False}, None)
+
+        def gd_mount_text(self):
+            return self.gd_mp.get_text().strip() or self.gd_default
+
+        def gd_refresh(self, info=False):
+            mp = self.gd_mount_text()
+
+            def worker():
+                try:
+                    mpc = gd_check_mount(mp)
+                except RuntimeError:
+                    mpc = mp
+                ready = gd_remote_ready() if shutil.which("rclone") else False
+                st = gd_state(mpc)
+                extra = (gd_userinfo(), gd_about()) if (info and ready and gd_have()) else None
+                GLib.idle_add(self.gd_apply, ready, st, extra)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def gd_apply(self, ready, st, extra):
+            mounted = st["mounted"]
+            if not gd_have():
+                self.gd_stat.set_text("○ A szükséges programok még nincsenek telepítve: a bejelentkezéskor "
+                                      "automatikusan telepítem őket.")
+            elif mounted:
+                self.gd_stat.set_text(f"● Csatlakoztatva: {self.gd_mount_text()}")
+            else:
+                self.gd_stat.set_text("○ Jelenleg nincs csatlakoztatva.")
+            if not ready:
+                self.gd_acct.set_text("Nincs bejelentkezve Google-fiókba.")
+            elif extra is not None:
+                acct, quota = extra
+                self.gd_acct.set_text("Fiók: " + (acct or "bejelentkezve") + (f"   ·   {quota}" if quota else ""))
+            elif not self.gd_acct.get_text().startswith("Fiók"):
+                self.gd_acct.set_text("Bejelentkezve Google-fiókba.")
+            self.gd_b_connect.set_label("Csatlakoztatás" if ready else "Bejelentkezés Google-fiókkal és csatlakoztatás")
+            self.gd_b_connect.set_sensitive(not mounted)
+            self.gd_b_open.set_sensitive(mounted)
+            self.gd_b_disc.set_sensitive(mounted)
+            self.gd_b_out.set_sensitive(ready)
+            return False
+
+        def gd_connect(self, *_):
+            try:
+                mp = gd_check_mount(self.gd_mount_text())
+            except RuntimeError as e:
+                self.say(1, str(e))
+                return
+            need = [p for p in GD_PKGS if not pkg_ok(p)]
+            if not need:
+                self.gd_step_prepare(mp)
+                return
+            if self.confirm("A Google Drive használatához telepítem a következő programokat: " + ", ".join(need) +
+                            ".\n\nFolytatod?"):
+                self.run_task([("pkg", {"action": "install", "pkgs": need})],
+                              lambda rc, *_: rc == 0 and self.gd_step_prepare(mp))
+
+        def gd_step_prepare(self, mp):
+            try:
+                ok = gd_mounted(mp) or (os.path.isdir(mp) and os.access(mp, os.W_OK) and not os.listdir(mp))
+            except OSError:
+                ok = False
+            if ok:
+                self.gd_step_login(mp)
+            else:
+                self.run_task([("gd_prepare", {"mountpoint": mp})], lambda rc, *_: rc == 0 and self.gd_step_login(mp))
+
+        def gd_step_login(self, mp):
+            if gd_remote_ready():
+                self.gd_step_mount(mp)
+            else:
+                self.gd_login_flow(lambda ok: ok and self.gd_step_mount(mp))
+
+        def gd_step_mount(self, mp):
+            auto = self.gd_chk_auto.get_active()
+            self.run_local(lambda: gd_start(mp, auto), lambda rc, msg, data: self.gd_refresh(info=True))
+
+        def gd_login_flow(self, cb):
+            d, area = self.xp_dialog("Bejelentkezés a Google-fiókba", "cloud", "", "OK")
+            box = Gtk.Box(orientation=V, spacing=12)
+            box.set_border_width(18)
+            l = Gtk.Label(xalign=0)
+            l.set_line_wrap(True)
+            l.set_max_width_chars(60)
+            l.set_markup("<b>A böngészőben megnyílik a Google bejelentkezési oldala.</b>\n\n"
+                         "Jelentkezz be a Google-fiókodba, majd engedélyezd a hozzáférést. Ha elkészültél, "
+                         "térj vissza ide: az ablak magától bezárul.")
+            pb = Gtk.ProgressBar()
+            ulbl = Gtk.Label(xalign=0)
+            ulbl.set_line_wrap(True)
+            ulbl.set_line_wrap_mode(2)
+            ulbl.set_max_width_chars(60)
+            ulbl.set_selectable(True)
+            ubar = Gtk.Box(spacing=8)
+            urls = {"v": ""}
+
+            def open_url(*_):
+                try:
+                    subprocess.Popen(["xdg-open", urls["v"]], start_new_session=True)
+                except OSError:
+                    pass
+
+            def copy_url(*_):
+                from gi.repository import Gdk
+                Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(urls["v"], -1)
+            ubar.pack_start(self.btn("Hivatkozás megnyitása", open_url), False, False, 0)
+            ubar.pack_start(self.btn("Hivatkozás másolása", copy_url), False, False, 0)
+            for w in (ulbl, ubar):
+                w.set_no_show_all(True)
+            box.pack_start(l, False, False, 0)
+            box.pack_start(pb, False, False, 0)
+            box.pack_start(ulbl, False, False, 0)
+            box.pack_start(ubar, False, False, 0)
+
+            def show_url(u):
+                urls["v"] = u
+                ulbl.set_text("Ha a böngésző nem nyílt meg magától, nyisd meg ezt a hivatkozást:\n" + u)
+                ulbl.show()
+                ubar.show_all()
+                return False
+            area.pack_start(box, True, True, 0)
+            d.show_all()
+            d.get_widget_for_response(Gtk.ResponseType.OK).hide()
+            holder, result, alive = {}, {}, {"v": True}
+            holder["on_url"] = lambda u: GLib.idle_add(show_url, u)
+            cid, sec = self.gd_cid.get_text().strip(), self.gd_csec.get_text().strip()
+
+            def worker():
+                try:
+                    result["ok"] = gd_login(holder, cid, sec)
+                except Exception as e:  # noqa: BLE001
+                    result["err"] = str(e)
+
+                def close():
+                    if alive["v"]:
+                        d.response(Gtk.ResponseType.OK)
+                    return False
+                GLib.idle_add(close)
+
+            def tick():
+                if alive["v"]:
+                    pb.pulse()
+                return alive["v"]
+            GLib.timeout_add(150, tick)
+            threading.Thread(target=worker, daemon=True).start()
+            resp = d.run()
+            alive["v"] = False
+            if resp != Gtk.ResponseType.OK:
+                holder["cancel"] = True
+                p = holder.get("proc")
+                if p:
+                    p.kill()
+            d.destroy()
+            if result.get("ok"):
+                self.say(0, "Sikeres bejelentkezés a Google-fiókba.")
+                cb(True)
+            else:
+                self.say(1, result.get("err") or "A bejelentkezés megszakadt.")
+                cb(False)
+
+        def gd_open(self, *_):
+            try:
+                subprocess.Popen(["xdg-open", self.gd_mount_text()], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A mappa nem nyitható meg: {e}")
+
+        def gd_disconnect(self, *_):
+            try:
+                mp = gd_check_mount(self.gd_mount_text())
+            except RuntimeError as e:
+                self.say(1, str(e))
+                return
+            self.run_local(lambda: gd_stop(mp), lambda rc, msg, data: self.gd_refresh())
+
+        def gd_signout(self, *_):
+            try:
+                mp = gd_check_mount(self.gd_mount_text())
+            except RuntimeError as e:
+                self.say(1, str(e))
+                return
+            if self.confirm("Kijelentkezel a Google-fiókból?\n\nA Google Drive lecsatlakozik, és a hozzáférési kulcs "
+                            "törlődik erről a gépről. A fájljaid a Google Drive-on megmaradnak. A hozzáférést a Google-"
+                            "fiókod biztonsági beállításaiban (Harmadik fél hozzáférése) is visszavonhatod."):
+                self.run_local(lambda: gd_logout(mp), lambda rc, msg, data: self.gd_refresh())
 
         # ------------------------------------------------ Tartományba léptetés
         def page_domain(self):
